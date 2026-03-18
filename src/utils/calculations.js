@@ -48,14 +48,15 @@ function calculateDifference({ actual_cash_counted = 0, expected_cash = 0 }) {
   return roundCurrency(toNumber(actual_cash_counted) - toNumber(expected_cash));
 }
 
-function calculateNetSale({ cash_total = 0, card_total = 0 }) {
-  return roundCurrency(toNumber(cash_total) + toNumber(card_total));
+function calculateNetSale({ cash_total = 0, card_total = 0, transfer_total = 0 }) {
+  return roundCurrency(toNumber(cash_total) + toNumber(card_total) + toNumber(transfer_total));
 }
 
 function calculateReportValues(input) {
   const openingCash = toNumber(input.opening_cash);
   const cashTotal = toNumber(input.cash_total);
   const cardTotal = toNumber(input.card_total);
+  const transferTotal = toNumber(input.transfer_total);
   const expense = toNumber(input.expense);
   const safeBoxAmount = toNumber(input.safe_box_amount);
   const actualCashCounted = toNumber(input.actual_cash_counted);
@@ -68,7 +69,8 @@ function calculateReportValues(input) {
     ? roundCurrency(toNumber(input.net_sale))
     : calculateNetSale({
         cash_total: cashTotal,
-        card_total: cardTotal
+        card_total: cardTotal,
+        transfer_total: transferTotal
       });
 
   const expectedCash = calculateExpectedCash({
@@ -76,13 +78,15 @@ function calculateReportValues(input) {
     net_sale: netSale
   });
 
-  const outflowTotal = roundCurrency(safeBoxAmount + cardTotal + expense + actualCashCounted);
+  // Outflow includes card and transfer as they are not physical cash
+  const outflowTotal = roundCurrency(safeBoxAmount + cardTotal + transferTotal + expense + actualCashCounted);
   const difference = roundCurrency(expectedCash - outflowTotal);
 
   return {
     opening_cash: roundCurrency(openingCash),
     cash_total: roundCurrency(cashTotal),
     card_total: roundCurrency(cardTotal),
+    transfer_total: roundCurrency(transferTotal),
     expense: roundCurrency(expense),
     safe_box_amount: roundCurrency(safeBoxAmount),
     actual_cash_counted: roundCurrency(actualCashCounted),

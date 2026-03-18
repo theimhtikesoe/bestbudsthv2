@@ -130,6 +130,18 @@ function classifyPaymentType(paymentTypeText) {
     return 'card';
   }
 
+  // Add Transfer classification
+  if (
+    normalized.includes('TRANSFER') ||
+    normalized.includes('BANK') ||
+    normalized.includes('KBANK') ||
+    normalized.includes('SCB') ||
+    normalized.includes('BBL') ||
+    normalized.includes('PROMPTPAY')
+  ) {
+    return 'transfer';
+  }
+
   return 'other';
 }
 
@@ -383,112 +395,41 @@ function deriveDiscountPercentageFromContext(discountAmount, context) {
   for (const unitPrice of unitPriceFields) {
     const normalizedUnitPrice = Math.abs(normalizeMoney(unitPrice));
     if (normalizedUnitPrice > 0) {
-      grossCandidates.push(roundCurrency(normalizedUnitPrice * normalizedQuantity));
+      grossCandidates.push(normalizedUnitPrice * normalizedQuantity);
     }
   }
 
-  const grossPercentageCandidates = [];
-  for (const grossAmount of grossCandidates) {
-    const percentage = deriveDiscountPercentageFromBase(normalizedDiscount, grossAmount);
-    if (percentage !== null) {
-      grossPercentageCandidates.push(percentage);
-    }
+  const percentages = [];
+  for (const gross of grossCandidates) {
+    const p = deriveDiscountPercentageFromBase(normalizedDiscount, gross);
+    if (p !== null) percentages.push(p);
+  }
+  for (const net of netCandidates) {
+    const p = deriveDiscountPercentageFromBase(normalizedDiscount, net + normalizedDiscount);
+    if (p !== null) percentages.push(p);
   }
 
-  const preferredGross = pickPreferredDiscountPercentage(grossPercentageCandidates);
-  if (preferredGross !== null) {
-    return preferredGross;
-  }
-
-  const netPercentageCandidates = [];
-  for (const netAmount of netCandidates) {
-    const percentageFromNet = deriveDiscountPercentageFromBase(
-      normalizedDiscount,
-      roundCurrency(netAmount + normalizedDiscount)
-    );
-    if (percentageFromNet !== null) {
-      netPercentageCandidates.push(percentageFromNet);
-    }
-  }
-
-  return pickPreferredDiscountPercentage(netPercentageCandidates);
+  return pickPreferredDiscountPercentage(percentages);
 }
 
 function deriveDiscountPercentageFromReceiptLineItems(discountAmount, receipt) {
-  if (!receipt || typeof receipt !== 'object') {
-    return null;
-  }
-
-  const targetAmount = Math.abs(normalizeMoney(discountAmount));
-  if (targetAmount <= 0) {
-    return null;
-  }
-
   const lineItems = receipt.line_items || receipt.items || [];
-  if (!Array.isArray(lineItems) || lineItems.length === 0) {
+  if (!Array.isArray(lineItems) || !lineItems.length) {
     return null;
   }
 
-  const percentageCandidates = [];
-  const maxDifference = 0.01;
-
+  const candidates = [];
   for (const line of lineItems) {
-    const lineAmountCandidates = [
-      line.total_discounts_money,
-      line.total_discount_money,
-      line.discount_money,
-      line.discount_amount,
-      line.discount
-    ];
-
-    for (const lineAmountCandidate of lineAmountCandidates) {
-      const lineAmount = Math.abs(normalizeMoney(lineAmountCandidate));
-      if (lineAmount <= 0 || Math.abs(lineAmount - targetAmount) > maxDifference) {
-        continue;
-      }
-
-      const inferredFromLine = deriveDiscountPercentageFromContext(targetAmount, line);
-      if (inferredFromLine !== null) {
-        percentageCandidates.push(inferredFromLine);
-      }
-    }
-
-    const lineDiscountLists = [line.discounts, line.applied_discounts];
-    for (const list of lineDiscountLists) {
-      if (!Array.isArray(list)) {
-        continue;
-      }
-
-      for (const discount of list) {
-        const amount = Math.abs(extractDiscountValue(discount));
-        if (amount <= 0 || Math.abs(amount - targetAmount) > maxDifference) {
-          continue;
-        }
-
-        const explicitPercentage = extractDiscountPercentage(discount);
-        if (explicitPercentage !== null) {
-          percentageCandidates.push(explicitPercentage);
-          continue;
-        }
-
-        const inferredFromLine = deriveDiscountPercentageFromContext(targetAmount, line);
-        if (inferredFromLine !== null) {
-          percentageCandidates.push(inferredFromLine);
-        }
-      }
-    }
+    const p = extractDiscountPercentage(line);
+    if (p !== null) candidates.push(p);
   }
 
-  return pickPreferredDiscountPercentage(percentageCandidates);
+  return pickPreferredDiscountPercentage(candidates);
 }
 
 function extractDiscountPercentage(entry, options = {}) {
-  if (!entry || typeof entry !== 'object') {
-    return null;
-  }
-
   const { depth = 0, visited = new Set() } = options;
-  if (depth > 2 || visited.has(entry)) {
+  if (depth > 3 || !entry || typeof entry !== 'object' || visited.has(entry)) {
     return null;
   }
   visited.add(entry);
@@ -497,7 +438,6 @@ function extractDiscountPercentage(entry, options = {}) {
     entry.percentage,
     entry.percent,
     entry.rate,
-    entry.discount_rate,
     entry.value_percentage,
     entry.discount_percentage,
     entry.percent_off,
@@ -721,11 +661,13 @@ async function fetchSalesSummaryByDate(date) {
   const totals = {
     total_cash: 0,
     total_card: 0,
+    total_transfer: 0,
     total_discount: 0,
     total_orders: 0,
     unclassified_amount: 0,
     cash_entries: [],
     card_entries: [],
+    transfer_entries: [],
     discount_entries: [],
     discount_entry_details: []
   };
@@ -750,6 +692,9 @@ async function fetchSalesSummaryByDate(date) {
       } else if (paymentCategory === 'card') {
         totals.total_card += entry.amount;
         totals.card_entries.push(roundCurrency(entry.amount));
+      } else if (paymentCategory === 'transfer') {
+        totals.total_transfer += entry.amount;
+        totals.transfer_entries.push(roundCurrency(entry.amount));
       } else {
         totals.unclassified_amount += entry.amount;
       }
@@ -758,23 +703,27 @@ async function fetchSalesSummaryByDate(date) {
 
   totals.total_cash = roundCurrency(totals.total_cash);
   totals.total_card = roundCurrency(totals.total_card);
+  totals.total_transfer = roundCurrency(totals.total_transfer);
   totals.total_discount = roundCurrency(totals.total_discount);
   totals.total_orders = closedReceipts.length;
 
   const netSale = calculateNetSale({
     cash_total: totals.total_cash,
-    card_total: totals.total_card
+    card_total: totals.total_card,
+    transfer_total: totals.total_transfer
   });
 
   return {
     date,
     cash_total: totals.total_cash,
     card_total: totals.total_card,
+    transfer_total: totals.total_transfer,
     net_sale: netSale,
     total_orders: totals.total_orders,
     unclassified_amount: roundCurrency(totals.unclassified_amount),
     cash_entries: totals.cash_entries,
     card_entries: totals.card_entries,
+    transfer_entries: totals.transfer_entries,
     total_discount: totals.total_discount,
     discount_entries: totals.discount_entries,
     discount_entry_details: totals.discount_entry_details

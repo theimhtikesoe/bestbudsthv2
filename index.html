@@ -36,6 +36,10 @@
             <label for="reportDate" class="form-label">Report Date</label>
             <input id="reportDate" type="date" class="form-control" />
           </div>
+          <div class="flex-grow-1">
+            <label class="form-label">Transfer Total</label>
+            <input id="transferTotal" type="text" class="form-control" readonly value="฿0.00" />
+          </div>
           <button id="syncButton" class="btn btn-primary">Sync From Loyverse</button>
         </div>
 
@@ -66,7 +70,7 @@
 
         <h2 class="h5 mt-4 mb-3">Order Payment Details</h2>
         <div class="row g-3">
-          <div class="col-md-4">
+          <div class="col-md-3">
             <div class="detail-box">
               <div class="detail-box-head">
                 <span>Cash Entries</span>
@@ -75,7 +79,7 @@
               <ol id="cashEntriesList" class="detail-list mb-0"></ol>
             </div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <div class="detail-box">
               <div class="detail-box-head">
                 <span>Card Entries</span>
@@ -84,7 +88,16 @@
               <ol id="cardEntriesList" class="detail-list mb-0"></ol>
             </div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
+            <div class="detail-box">
+              <div class="detail-box-head">
+                <span>Transfer Entries</span>
+                <strong id="transferEntriesTotal">฿0.00</strong>
+              </div>
+              <ol id="transferEntriesList" class="detail-list mb-0"></ol>
+            </div>
+          </div>
+          <div class="col-md-3">
             <div class="detail-box">
               <div class="detail-box-head">
                 <span>Discount Entries</span>
