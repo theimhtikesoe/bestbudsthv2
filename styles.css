@@ -1,3 +1,16 @@
+/* User requested UI cleanup - Hiding elements */
+#loadButton, 
+.manual-inputs-row, 
+h2:nth-of-type(1), 
+h2:nth-of-type(2), 
+.row.g-3.mb-3:not(.d-flex), 
+.d-flex.flex-wrap.align-items-center.gap-3.mt-4,
+main > section:nth-of-type(2), 
+main > section:nth-of-type(3) {
+  display: none !important;
+}
+
+/* Base Styles */
 :root {
   --ink: #2d261f;
   --ink-soft: #5c4a35;
@@ -58,17 +71,6 @@ body {
   transition: transform 0.15s ease, box-shadow 0.15s ease, color 0.15s ease;
 }
 
-.made-by-tag:hover {
-  color: #4f2f08;
-  transform: translateY(-1px);
-  box-shadow: 0 9px 16px rgba(84, 55, 20, 0.2);
-}
-
-.made-by-tag:focus-visible {
-  outline: 2px solid rgba(125, 77, 15, 0.5);
-  outline-offset: 2px;
-}
-
 .brand-logo {
   width: 60px;
   height: 60px;
@@ -89,38 +91,6 @@ body {
 .brand-text p {
   color: var(--ink-soft) !important;
   margin: 0;
-}
-
-@media (max-width: 576px) {
-  .header-bar {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 8px;
-  }
-
-  .brand-wrap {
-    gap: 10px;
-  }
-
-  .brand-logo {
-    width: 48px;
-    height: 48px;
-    border-radius: 10px;
-    padding: 5px;
-  }
-
-  .brand-text h1 {
-    font-size: 1.05rem;
-  }
-
-  .brand-text p {
-    font-size: 0.82rem;
-  }
-
-  .made-by-tag {
-    font-size: 0.78rem;
-    padding: 5px 10px;
-  }
 }
 
 .card {
@@ -150,84 +120,6 @@ body {
   color: var(--accent-strong);
   border-left: 4px solid var(--accent);
   padding-left: 8px;
-  font-weight: 700;
-}
-
-#reportSection .form-label {
-  color: var(--ink-soft);
-  font-weight: 700;
-  letter-spacing: 0.2px;
-}
-
-.manual-inputs-row .form-label {
-  min-height: 2.4rem;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  line-height: 1.2;
-}
-
-.cash-focus-col {
-  position: relative;
-}
-
-.one-k-bill-col .form-label,
-.safe-box-col .form-label {
-  color: #7f4d18;
-}
-
-.one-k-bill-col .form-control,
-.safe-box-col .form-control {
-  background: linear-gradient(180deg, #fff7eb, #fde9cb);
-  border-color: #c9964d;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-}
-
-.one-k-bill-col .form-control:focus,
-.safe-box-col .form-control:focus {
-  border-color: #9a6114;
-  box-shadow: 0 0 0 0.2rem rgba(160, 101, 20, 0.2);
-}
-
-.cash-focus-col .form-label {
-  color: #6f4512;
-}
-
-.cash-focus-label-line {
-  display: block;
-}
-
-.cash-focus-col .form-control {
-  background: linear-gradient(180deg, #fff8ed, #fdf0dc);
-  border-color: #d2ad73;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
-}
-
-.cash-focus-col .form-control:focus {
-  border-color: #aa6d14;
-  box-shadow: 0 0 0 0.2rem rgba(182, 120, 30, 0.22);
-}
-
-#reportSection .form-control {
-  background: #fffcf7;
-  border: 1px solid var(--paper-line);
-  color: var(--ink);
-  font-weight: 600;
-}
-
-#reportSection .form-control:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 0.2rem rgba(182, 120, 30, 0.18);
-}
-
-#reportSection .form-control[readonly] {
-  background: #fdf1df;
-  border-style: dashed;
-  color: #5e4323;
-}
-
-#reportSection .btn {
-  border-radius: 999px;
   font-weight: 700;
 }
 
@@ -261,228 +153,4 @@ body {
   padding: 2px 0;
   color: #3f3124;
   font-weight: 600;
-}
-
-#reportsTable thead th {
-  background: linear-gradient(180deg, #f3e2c7, #ead0a8);
-  color: #51330b;
-  border-color: rgba(125, 77, 15, 0.2);
-}
-
-#reportsTable tbody tr:nth-child(odd) {
-  background: rgba(255, 248, 233, 0.68);
-}
-
-.print-past-btn {
-  border-radius: 999px;
-}
-
-.chart-wrap {
-  position: relative;
-  height: 300px;
-  background: linear-gradient(180deg, #ffffff, #f7efe2);
-  border: 1px solid rgba(177, 132, 73, 0.24);
-  border-radius: 0.75rem;
-  padding: 10px;
-}
-
-.diff-positive {
-  color: var(--positive);
-  font-weight: 700;
-}
-
-.diff-negative {
-  color: var(--negative);
-  font-weight: 700;
-}
-
-@page {
-  size: A4 landscape;
-  margin: 10mm;
-}
-
-@media print {
-  html,
-  body {
-    width: 297mm !important;
-    min-height: 210mm !important;
-    background: #ffffff !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-
-  *,
-  *::before,
-  *::after {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-    text-shadow: none !important;
-    box-shadow: none !important;
-  }
-
-  .app-header,
-  #message,
-  main > section:not(#reportSection),
-  .no-export {
-    display: none !important;
-  }
-
-  .container,
-  main {
-    max-width: 100% !important;
-    width: 100% !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  #reportSection {
-    margin: 0 !important;
-    border: 1px solid #cda66a !important;
-    border-radius: 0 !important;
-    background: #fffaf1 !important;
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-  }
-
-  #reportSection .card-body {
-    border-radius: 0 !important;
-    padding: 8mm !important;
-    background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 246, 229, 0.96)),
-      repeating-linear-gradient(
-        0deg,
-        rgba(189, 137, 53, 0.08) 0,
-        rgba(189, 137, 53, 0.08) 1px,
-        transparent 1px,
-        transparent 24px
-      ) !important;
-  }
-
-  #reportSection h2 {
-    color: #613b0e !important;
-    background: #f4ddb8 !important;
-    border-left: 4px solid #ac6f16 !important;
-    padding: 5px 8px !important;
-    border-radius: 4px;
-  }
-
-  #reportSection .form-label {
-    color: #654015 !important;
-  }
-
-  .manual-inputs-row {
-    display: grid !important;
-    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-    gap: 8px 10px !important;
-    align-items: stretch !important;
-    margin: 0 !important;
-    --bs-gutter-x: 0 !important;
-    --bs-gutter-y: 0 !important;
-  }
-
-  .manual-inputs-row > [class*="col-"] {
-    width: auto !important;
-    max-width: none !important;
-    flex: 0 0 auto !important;
-    margin: 0 !important;
-    padding: 6px 8px !important;
-    border: 1px solid #cfad7a !important;
-    border-radius: 6px !important;
-    background: #fff8eb !important;
-  }
-
-  .manual-inputs-row .form-label {
-    display: block !important;
-    min-height: auto !important;
-    margin: 0 0 4px !important;
-    line-height: 1.2 !important;
-    font-size: 12px !important;
-    white-space: nowrap !important;
-  }
-
-  .manual-inputs-row .form-control {
-    min-height: 34px !important;
-    height: 34px !important;
-    padding: 4px 7px !important;
-    font-size: 12px !important;
-  }
-
-  #expectedCash,
-  #difference,
-  #safeBoxApplied {
-    min-height: 34px !important;
-    height: 34px !important;
-    font-size: 12px !important;
-  }
-
-  .cash-focus-col .form-label {
-    color: #613d11 !important;
-    font-weight: 800 !important;
-  }
-
-  #openingCash,
-  #actualCashCounted {
-    border-width: 1.5px !important;
-  }
-
-  .cash-focus-label-line {
-    display: inline !important;
-  }
-
-  .cash-focus-label-line + .cash-focus-label-line::before {
-    content: " ";
-  }
-
-  #reportSection .form-control {
-    border: 1px solid #ceaa73 !important;
-    background: #ffffff !important;
-    color: #2d261f !important;
-    font-weight: 700 !important;
-  }
-
-  .cash-focus-col .form-control {
-    background: #fef0da !important;
-    border-color: #bb8a42 !important;
-  }
-
-  .one-k-bill-col .form-control,
-  .safe-box-col .form-control {
-    background: #fff0d8 !important;
-    border-color: #bf8e47 !important;
-  }
-
-  #reportSection .form-control[readonly] {
-    background: #f7e9d1 !important;
-  }
-
-  .detail-box {
-    border: 1px solid #cfad7a !important;
-    background: #fffaf1 !important;
-    min-height: 180px !important;
-  }
-
-  .detail-box-head {
-    background: #f2ddb8 !important;
-    color: #5d3a0f !important;
-    border-bottom: 1px solid #cfad7a !important;
-  }
-
-  .detail-list {
-    max-height: none !important;
-    overflow: visible !important;
-  }
-
-  .diff-positive {
-    color: #0b7555 !important;
-    background: rgba(11, 117, 85, 0.14) !important;
-    padding: 2px 6px !important;
-    border-radius: 999px;
-  }
-
-  .diff-negative {
-    color: #b93a2d !important;
-    background: rgba(185, 58, 45, 0.14) !important;
-    padding: 2px 6px !important;
-    border-radius: 999px;
-  }
 }
