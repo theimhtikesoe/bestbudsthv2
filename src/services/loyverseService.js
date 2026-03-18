@@ -38,12 +38,17 @@ function getDateBounds(date) {
     throw new Error('Invalid date format. Use YYYY-MM-DD.');
   }
 
-  // Loyverse API accepts ISO 8601 format with timezone offset
-  // We should send the exact local time bounds to avoid UTC conversion issues
+  // Loyverse API expects RFC 3339 format (ISO 8601 with colon in timezone offset)
+  // Format: YYYY-MM-DDTHH:mm:ss+HH:mm
   return {
-    startIso: startLocal.format('YYYY-MM-DDTHH:mm:ss.SSSZ'),
-    endIso: endLocal.format('YYYY-MM-DDTHH:mm:ss.SSSZ')
+    startIso: startLocal.format('YYYY-MM-DDTHH:mm:ssZ').replace(/([+-]\d{2})(\d{2})$/, '$1:$2'),
+    endIso: endLocal.format('YYYY-MM-DDTHH:mm:ssZ').replace(/([+-]\d{2})(\d{2})$/, '$1:$2')
   };
+  // Alternative: Use UTC timestamps for Loyverse API
+  // return {
+  //   startIso: startLocal.utc().format('YYYY-MM-DDTHH:mm:ss[Z]'),
+  //   endIso: endLocal.utc().format('YYYY-MM-DDTHH:mm:ss[Z]')
+  // };
 }
 
 async function fetchPaymentTypeMap() {
