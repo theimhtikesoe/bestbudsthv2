@@ -32,7 +32,8 @@ function getDateBounds(date) {
   
   // Explicitly parse in the target timezone to avoid local server time interference
   const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
-  const endLocal = dayjs.tz(`${date} 23:59:59.999`, tz);
+  // Extend end time to 3 AM next day to capture late-night transactions
+  const endLocal = dayjs.tz(`${date} 23:59:59.999`, tz).add(3, 'hours');
 
   if (!startLocal.isValid()) {
     throw new Error('Invalid date format. Use YYYY-MM-DD.');
