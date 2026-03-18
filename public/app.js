@@ -29,6 +29,9 @@ const els = {
   cashEntriesTotal: document.getElementById('cashEntriesTotal'),
   cardEntriesTotal: document.getElementById('cardEntriesTotal'),
   discountEntriesTotal: document.getElementById('discountEntriesTotal'),
+  transferTotal: document.getElementById('transferTotal'),
+  transferEntriesList: document.getElementById('transferEntriesList'),
+  transferEntriesTotal: document.getElementById('transferEntriesTotal'),
   reportsTableBody: document.querySelector('#reportsTable tbody'),
   unclassifiedHint: document.getElementById('unclassifiedHint')
 };
@@ -209,8 +212,10 @@ function normalizeEntries(entries) {
   return entries
     .map((entry) => {
       if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+        // Some backend responses might already have formatted data
+        const amount = entry.amount !== undefined ? entry.amount : entry;
         return {
-          amount: round2(parseNumber(entry.amount)),
+          amount: round2(parseNumber(amount)),
           percentage: parsePercentage(entry.percentage ?? entry.percent ?? entry.rate)
         };
       }
@@ -246,7 +251,10 @@ function renderEntryList(listElement, entries, options = {}) {
 
   entries.forEach((entry, index) => {
     const li = document.createElement('li');
+    // Note: The index is handled by the <ol> tag's default numbering if list-style is not hidden
+    // but since the user wants a specific format, we'll keep it as text
     const prefix = `${index + 1}. `;
+    
     if (showPercentage) {
       if (entry.percentage !== null) {
         li.textContent = percentageOnly
@@ -264,9 +272,10 @@ function renderEntryList(listElement, entries, options = {}) {
   });
 }
 
-function applyPaymentDetails({ cash_entries, card_entries, discount_entries, discount_entry_details, total_discount }) {
+function applyPaymentDetails({ cash_entries, card_entries, transfer_entries, discount_entries, discount_entry_details, total_discount }) {
   const cashEntries = normalizeEntries(cash_entries);
   const cardEntries = normalizeEntries(card_entries);
+  const transferEntries = normalizeEntries(transfer_entries);
   const discountEntries = normalizeEntries(
     Array.isArray(discount_entry_details) && discount_entry_details.length
       ? discount_entry_details
@@ -275,6 +284,7 @@ function applyPaymentDetails({ cash_entries, card_entries, discount_entries, dis
 
   renderEntryList(els.cashEntriesList, cashEntries);
   renderEntryList(els.cardEntriesList, cardEntries);
+  renderEntryList(els.transferEntriesList, transferEntries);
   renderEntryList(els.discountEntriesList, discountEntries, {
     showPercentage: true,
     percentageOnly: true
@@ -282,6 +292,7 @@ function applyPaymentDetails({ cash_entries, card_entries, discount_entries, dis
 
   const cashTotal = cashEntries.reduce((sum, entry) => sum + entry.amount, 0);
   const cardTotal = cardEntries.reduce((sum, entry) => sum + entry.amount, 0);
+  const transferTotal = transferEntries.reduce((sum, entry) => sum + entry.amount, 0);
   const discountTotalFromEntries = discountEntries.reduce((sum, entry) => sum + entry.amount, 0);
   const discountTotalFromApi = round2(parseNumber(total_discount));
   const discountTotal = discountTotalFromApi > 0 ? discountTotalFromApi : discountTotalFromEntries;
@@ -291,6 +302,9 @@ function applyPaymentDetails({ cash_entries, card_entries, discount_entries, dis
   }
   if (els.cardEntriesTotal) {
     els.cardEntriesTotal.textContent = formatCurrency(cardTotal);
+  }
+  if (els.transferEntriesTotal) {
+    els.transferEntriesTotal.textContent = formatCurrency(transferTotal);
   }
   if (els.discountEntriesTotal) {
     els.discountEntriesTotal.textContent = formatCurrency(discountTotal);
@@ -532,6 +546,9 @@ function ensureManualInputsEnabled() {
 function applySyncSummaryToFields(data) {
   els.cashTotal.value = round2(parseNumber(data.cash_total)).toFixed(2);
   els.cardTotal.value = round2(parseNumber(data.card_total)).toFixed(2);
+  if (els.transferTotal) {
+    els.transferTotal.value = round2(parseNumber(data.transfer_total)).toFixed(2);
+  }
   els.netSale.value = round2(parseNumber(data.net_sale)).toFixed(2);
   els.totalOrders.value = parseInt(data.total_orders || 0, 10);
 

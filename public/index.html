@@ -65,11 +65,15 @@
             <label for="cashTotal" class="form-label">Cash Total</label>
             <input id="cashTotal" type="number" min="0" step="0.01" class="form-control" readonly />
           </div>
-          <div class="col-md-3">
+          <div class="col-md-2">
             <label for="cardTotal" class="form-label">Card Total</label>
             <input id="cardTotal" type="number" min="0" step="0.01" class="form-control" readonly />
           </div>
-          <div class="col-md-3">
+          <div class="col-md-2">
+            <label for="transferTotal" class="form-label">Transfer Total</label>
+            <input id="transferTotal" type="number" min="0" step="0.01" class="form-control" readonly />
+          </div>
+          <div class="col-md-2">
             <label for="totalOrders" class="form-label">Total Orders</label>
             <input id="totalOrders" type="number" min="0" step="1" class="form-control" readonly />
           </div>
@@ -124,31 +128,40 @@
 
         <h2 class="h5 mt-4 mb-3">Order Payment Details</h2>
         <div class="row g-3">
-          <div class="col-md-4">
+          <div class="col-md-3">
             <div class="detail-box">
               <div class="detail-box-head">
                 <span>Cash Entries</span>
                 <strong id="cashEntriesTotal">฿0.00</strong>
               </div>
-              <ol id="cashEntriesList" class="detail-list mb-0"></ol>
+              <ul id="cashEntriesList" class="detail-list mb-0"></ul>
             </div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
             <div class="detail-box">
               <div class="detail-box-head">
                 <span>Card Entries</span>
                 <strong id="cardEntriesTotal">฿0.00</strong>
               </div>
-              <ol id="cardEntriesList" class="detail-list mb-0"></ol>
+              <ul id="cardEntriesList" class="detail-list mb-0"></ul>
             </div>
           </div>
-          <div class="col-md-4">
+          <div class="col-md-3">
+            <div class="detail-box">
+              <div class="detail-box-head">
+                <span>Transfer Entries</span>
+                <strong id="transferEntriesTotal">฿0.00</strong>
+              </div>
+              <ul id="transferEntriesList" class="detail-list mb-0"></ul>
+            </div>
+          </div>
+          <div class="col-md-3">
             <div class="detail-box">
               <div class="detail-box-head">
                 <span>Discount Entries</span>
                 <strong id="discountEntriesTotal">฿0.00</strong>
               </div>
-              <ol id="discountEntriesList" class="detail-list mb-0"></ol>
+              <ul id="discountEntriesList" class="detail-list mb-0"></ul>
             </div>
           </div>
         </div>
