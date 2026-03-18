@@ -55,12 +55,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const amount = parseFloat(entry.amount || 0);
       
       if (isDiscount) {
-        // For discount entries, show amount and percentage
+        // For discount entries, show percentage only
         const percentage = parseFloat(entry.percentage || 0);
-        li.textContent = `${index + 1}. ${amount.toFixed(2)} (${percentage.toFixed(2)}%)`;
+        li.textContent = `${index + 1}. ${percentage.toFixed(0)}%`;
       } else {
-        // For other entries, show only the amount (no order name)
-        li.textContent = `${index + 1}. ${amount.toFixed(2)}`;
+        // For other entries, show THB amount
+        li.textContent = `${index + 1}. THB ${amount.toFixed(2)}`;
       }
       
       listEl.appendChild(li);
