@@ -21,7 +21,19 @@
     integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
     crossorigin="anonymous"
   />
-  <link rel="stylesheet" href="/styles.css?v=20260223b" />
+  <link rel="stylesheet" href="/styles.css?v=20260223c" />
+  <style>
+    /* User requested UI cleanup */
+    #loadButton, .manual-inputs-row, h2:nth-of-type(1), h2:nth-of-type(2), 
+    .row.g-3.mb-3:not(.d-flex), .d-flex.flex-wrap.align-items-center.gap-3.mt-4,
+    section:nth-of-type(2), section:nth-of-type(3) {
+      display: none !important;
+    }
+    /* Keep only what is requested */
+    #reportDate, #syncButton, .row.g-3:has(#cashEntriesList) {
+      display: flex !important;
+    }
+  </style>
 </head>
 <body>
   <header class="app-header py-4 mb-4">
@@ -56,10 +68,11 @@
             <label for="reportDate" class="form-label">Report Date</label>
             <input id="reportDate" type="date" class="form-control" />
           </div>
+          <button id="loadButton" class="btn btn-outline-secondary no-export">Load Saved Report</button>
           <button id="syncButton" class="btn btn-primary no-export">Sync From Loyverse</button>
         </div>
 
-        <div class="row g-3 mb-3 d-none">
+        <div class="row g-3 mb-3">
           <div class="col-md-3">
             <label for="cashTotal" class="form-label">Cash Total</label>
             <input id="cashTotal" type="number" min="0" step="0.01" class="form-control" readonly />
@@ -78,20 +91,47 @@
           </div>
         </div>
 
-        <div class="d-none">
-          <h2 class="h5 mt-4 mb-3">Manual Inputs</h2>
-          <input id="expense" type="hidden" />
-          <input id="tip" type="hidden" />
-          <input id="oneKBillCount" type="hidden" value="0" />
-          <input id="openingCash" type="hidden" />
-          <input id="actualCashCounted" type="hidden" />
+        <h2 class="h5 mt-4 mb-3">Manual Inputs</h2>
+        <div class="row g-3 mb-3 manual-inputs-row">
+          <div class="col-md-2">
+            <label for="expense" class="form-label">Expense</label>
+            <input id="expense" type="text" inputmode="decimal" class="form-control calc-input" />
+          </div>
+          <div class="col-md-2">
+            <label for="tip" class="form-label">Tip</label>
+            <input id="tip" type="text" inputmode="decimal" class="form-control" />
+          </div>
+          <div class="col-md-2 one-k-bill-col">
+            <label for="oneKBillCount" class="form-label">1,000 THB Bills (Qty)</label>
+            <input id="oneKBillCount" type="number" min="0" step="1" class="form-control calc-input" value="0" />
+          </div>
+          <div class="col-md-3 cash-focus-col">
+            <label for="openingCash" class="form-label">Opening Cash</label>
+            <input id="openingCash" type="text" inputmode="decimal" class="form-control calc-input" />
+          </div>
+          <div class="col-md-3 cash-focus-col">
+            <label for="actualCashCounted" class="form-label">
+              <span class="cash-focus-label-line">Actual Cash</span>
+              <span class="cash-focus-label-line">Counted</span>
+            </label>
+            <input id="actualCashCounted" type="text" inputmode="decimal" class="form-control calc-input" />
+          </div>
         </div>
 
-        <div class="d-none">
-          <h2 class="h5 mt-4 mb-3">Auto Calculation</h2>
-          <input id="expectedCash" type="hidden" />
-          <input id="difference" type="hidden" />
-          <input id="safeBoxApplied" type="hidden" />
+        <h2 class="h5 mt-4 mb-3">Auto Calculation</h2>
+        <div class="row g-3">
+          <div class="col-md-4">
+            <label for="expectedCash" class="form-label">Expected Cash</label>
+            <input id="expectedCash" type="number" class="form-control" readonly />
+          </div>
+          <div class="col-md-4">
+            <label for="difference" class="form-label">Difference</label>
+            <input id="difference" type="number" class="form-control" readonly />
+          </div>
+          <div class="col-md-4">
+            <label for="safeBoxApplied" class="form-label">1K Bill Total</label>
+            <input id="safeBoxApplied" type="text" class="form-control" readonly />
+          </div>
         </div>
 
         <h2 class="h5 mt-4 mb-3">Order Payment Details</h2>
@@ -125,26 +165,60 @@
           </div>
         </div>
 
-        <div class="d-none">
-          <button id="saveButton"></button>
-          <button id="printButton"></button>
-          <button id="downloadImageButton"></button>
-          <button id="downloadPdfButton"></button>
-          <button id="loadButton"></button>
-          <span id="unclassifiedHint"></span>
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-4">
+          <button id="saveButton" class="btn btn-success no-export">Save Daily Report</button>
+          <button id="printButton" class="btn btn-outline-dark no-export">Print Report</button>
+          <button id="downloadImageButton" class="btn btn-outline-primary no-export">Download Image</button>
+          <button id="downloadPdfButton" class="btn btn-outline-danger no-export">Download PDF</button>
+          <span id="unclassifiedHint" class="text-muted small"></span>
         </div>
       </div>
     </section>
 
-    <section class="d-none">
-      <input id="fromDate" type="hidden" />
-      <input id="toDate" type="hidden" />
-      <button id="filterReports"></button>
-      <table id="reportsTable"><tbody></tbody></table>
+    <section class="card shadow-sm mb-4">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row align-items-lg-end gap-3 mb-3">
+          <h2 class="h5 mb-0 me-lg-auto">Past Reports</h2>
+          <div>
+            <label for="fromDate" class="form-label">From</label>
+            <input id="fromDate" type="date" class="form-control" />
+          </div>
+          <div>
+            <label for="toDate" class="form-label">To</label>
+            <input id="toDate" type="date" class="form-control" />
+          </div>
+          <button id="filterReports" class="btn btn-outline-primary">Filter</button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-striped align-middle" id="reportsTable">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Net Sale</th>
+                <th>Cash</th>
+                <th>Card</th>
+                <th>Orders</th>
+                <th>Expense</th>
+                <th>Safe Box</th>
+                <th>Expected Cash</th>
+                <th>Difference</th>
+                <th class="no-export">Action</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
     </section>
 
-    <section class="d-none">
-      <canvas id="netSalesChart"></canvas>
+    <section class="card shadow-sm">
+      <div class="card-body">
+        <h2 class="h5 mb-3">Net Sales (Last 7 Days)</h2>
+        <div class="chart-wrap">
+          <canvas id="netSalesChart"></canvas>
+        </div>
+      </div>
     </section>
   </main>
 
