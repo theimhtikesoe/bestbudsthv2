@@ -57,11 +57,48 @@
       <input id="netSale" type="text" class="form-control" readonly value="0.00" />
     </div>
 
+    <h2 class="section-title">Order Payment Details</h2>
+
+    <div class="detail-box">
+      <div class="detail-box-head">
+        <span>Cash Entries</span>
+        <span id="cashEntriesTotal">THB 0.00</span>
+      </div>
+      <ol id="cashEntriesList" class="detail-list"></ol>
+    </div>
+
+    <div class="detail-box">
+      <div class="detail-box-head">
+        <span>Card Entries</span>
+        <span id="cardEntriesTotal">THB 0.00</span>
+      </div>
+      <ol id="cardEntriesList" class="detail-list"></ol>
+    </div>
+
+    <div class="detail-box">
+      <div class="detail-box-head">
+        <span>Transfer Entries</span>
+        <span id="transferEntriesTotal">THB 0.00</span>
+      </div>
+      <ol id="transferEntriesList" class="detail-list"></ol>
+    </div>
+
+    <div class="detail-box">
+      <div class="detail-box-head">
+        <span>Discount Entries</span>
+        <span id="discountEntriesTotal">THB 0.00</span>
+      </div>
+      <ol id="discountEntriesList" class="detail-list"></ol>
+    </div>
+
+    <div class="action-row">
+      <button id="saveButton" class="btn btn-save">Save Daily Report</button>
+      <button id="printButton" class="btn btn-print">Print Report</button>
+    </div>
+
     <!-- Hidden elements to keep JS happy -->
     <div class="d-none">
       <div id="reportSection"></div>
-      <button id="saveButton"></button>
-      <button id="printButton"></button>
       <button id="downloadImageButton"></button>
       <button id="downloadPdfButton"></button>
       <input id="fromDate" type="date" />
@@ -76,14 +113,6 @@
       <input id="difference" type="number" value="0" />
       <input id="safeBoxApplied" type="text" value="0" />
       <div id="unclassifiedHint"></div>
-      <ol id="cashEntriesList"></ol>
-      <ol id="cardEntriesList"></ol>
-      <ol id="transferEntriesList"></ol>
-      <ol id="discountEntriesList"></ol>
-      <strong id="cashEntriesTotal"></strong>
-      <strong id="cardEntriesTotal"></strong>
-      <strong id="transferEntriesTotal"></strong>
-      <strong id="discountEntriesTotal"></strong>
       <table id="reportsTable"><tbody></tbody></table>
     </div>
   </div>

@@ -1,98 +1,122 @@
-const els = {
-  message: document.getElementById('message'),
-  reportDate: document.getElementById('reportDate'),
-  syncButton: document.getElementById('syncButton'),
-  cashTotal: document.getElementById('cashTotal'),
-  cardTotal: document.getElementById('cardTotal'),
-  transferTotal: document.getElementById('transferTotal'),
-  totalOrders: document.getElementById('totalOrders'),
-  netSale: document.getElementById('netSale')
-};
+document.addEventListener('DOMContentLoaded', () => {
+  const els = {
+    reportDate: document.getElementById('reportDate'),
+    loadButton: document.getElementById('loadButton'),
+    syncButton: document.getElementById('syncButton'),
+    saveButton: document.getElementById('saveButton'),
+    printButton: document.getElementById('printButton'),
+    cashTotal: document.getElementById('cashTotal'),
+    cardTotal: document.getElementById('cardTotal'),
+    transferTotal: document.getElementById('transferTotal'),
+    totalOrders: document.getElementById('totalOrders'),
+    netSale: document.getElementById('netSale'),
+    cashEntriesList: document.getElementById('cashEntriesList'),
+    cardEntriesList: document.getElementById('cardEntriesList'),
+    transferEntriesList: document.getElementById('transferEntriesList'),
+    discountEntriesList: document.getElementById('discountEntriesList'),
+    cashEntriesTotal: document.getElementById('cashEntriesTotal'),
+    cardEntriesTotal: document.getElementById('cardEntriesTotal'),
+    transferEntriesTotal: document.getElementById('transferEntriesTotal'),
+    discountEntriesTotal: document.getElementById('discountEntriesTotal'),
+    message: document.getElementById('message')
+  };
 
-function todayLocalDate() {
-  const now = new Date();
-  const tzOffset = now.getTimezoneOffset() * 60000;
-  return new Date(now - tzOffset).toISOString().slice(0, 10);
-}
+  // Set default date to today
+  function todayLocalDate() {
+    const now = new Date();
+    const tzOffset = now.getTimezoneOffset() * 60000;
+    return new Date(now - tzOffset).toISOString().slice(0, 10);
+  }
 
-function parseNumber(value) {
-  if (value === null || value === undefined) return 0;
-  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
-  let normalized = String(value).trim().replace(/฿/g, '').replace(/,/g, '');
-  const n = Number(normalized);
-  return Number.isFinite(n) ? n : 0;
-}
+  if (els.reportDate) els.reportDate.value = todayLocalDate();
 
-function round2(value) {
-  return Number((value || 0).toFixed(2));
-}
-
-function formatCurrency(value) {
-  return parseNumber(value).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
-
-function setMessage(text, variant = 'info') {
-  if (els.message) {
+  function showMessage(text, type = 'success') {
+    if (!els.message) return;
     els.message.textContent = text;
-    els.message.className = `alert alert-${variant}`;
-    setTimeout(() => {
-      els.message.className = 'alert d-none';
-    }, 5000);
-  }
-}
-
-async function syncFromLoyverse() {
-  if (!els.reportDate || !els.reportDate.value) {
-    setMessage('Please choose a report date first.', 'warning');
-    return;
+    els.message.className = `alert alert-${type}`;
+    els.message.classList.remove('d-none');
+    setTimeout(() => els.message.classList.add('d-none'), 5000);
   }
 
-  if (els.syncButton) {
-    els.syncButton.disabled = true;
-    els.syncButton.textContent = 'Syncing...';
-  }
-
-  try {
-    const response = await fetch(`/api/loyverse/sync?date=${els.reportDate.value}`);
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.message || 'Sync failed');
+  function renderEntries(listEl, totalEl, entries, type = 'THB') {
+    if (!listEl || !totalEl) return;
+    listEl.innerHTML = '';
+    let total = 0;
     
-    // Extract totals
-    const cashTotal = parseNumber(data.cash_total);
-    const cardTotal = parseNumber(data.card_total);
-    const transferTotal = parseNumber(data.transfer_total);
-    const totalOrders = data.total_orders || 0;
-    const netSale = round2(cashTotal + cardTotal + transferTotal);
+    if (!entries || entries.length === 0) {
+      listEl.innerHTML = '<li>-</li>';
+      totalEl.textContent = `${type} 0.00`;
+      return;
+    }
 
-    // Update UI
-    if (els.cashTotal) els.cashTotal.value = formatCurrency(cashTotal);
-    if (els.cardTotal) els.cardTotal.value = formatCurrency(cardTotal);
-    if (els.transferTotal) els.transferTotal.value = formatCurrency(transferTotal);
-    if (els.totalOrders) els.totalOrders.value = totalOrders;
-    if (els.netSale) els.netSale.value = formatCurrency(netSale);
+    entries.forEach((entry, index) => {
+      const li = document.createElement('li');
+      const amount = parseFloat(entry.amount || 0);
+      const name = entry.name || `Order #${index + 1}`;
+      li.textContent = `${index + 1}. ${name}: ${amount.toFixed(2)}`;
+      listEl.appendChild(li);
+      total += amount;
+    });
 
-    setMessage('Loyverse data synced successfully.', 'success');
-  } catch (error) {
-    setMessage(error.message, 'danger');
-  } finally {
-    if (els.syncButton) {
+    totalEl.textContent = `${type} ${total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+  }
+
+  async function syncFromLoyverse() {
+    if (!els.syncButton) return;
+    const originalText = els.syncButton.textContent;
+    els.syncButton.textContent = 'Syncing...';
+    els.syncButton.disabled = true;
+
+    try {
+      const date = els.reportDate.value;
+      const response = await fetch(`/api/loyverse/sync?date=${date}`);
+      const result = await response.json();
+
+      if (response.ok) {
+        const data = result || {};
+        
+        // Update Summary Fields
+        if (els.cashTotal) els.cashTotal.value = (data.cash_total || 0).toFixed(2);
+        if (els.cardTotal) els.cardTotal.value = (data.card_total || 0).toFixed(2);
+        if (els.transferTotal) els.transferTotal.value = (data.transfer_total || 0).toFixed(2);
+        if (els.totalOrders) els.totalOrders.value = data.total_orders || 0;
+        
+        const netSale = (data.cash_total || 0) + (data.card_total || 0) + (data.transfer_total || 0);
+        if (els.netSale) els.netSale.value = netSale.toFixed(2);
+
+        // Render Lists
+        renderEntries(els.cashEntriesList, els.cashEntriesTotal, data.cash_entries || []);
+        renderEntries(els.cardEntriesList, els.cardEntriesTotal, data.card_entries || []);
+        renderEntries(els.transferEntriesList, els.transferEntriesTotal, data.transfer_entries || []);
+        renderEntries(els.discountEntriesList, els.discountEntriesTotal, data.discount_entries || []);
+
+        showMessage('Data synced successfully from Loyverse');
+      } else {
+        showMessage(result.message || 'Failed to sync data', 'danger');
+      }
+    } catch (error) {
+      console.error('Sync Error:', error);
+      showMessage('Error connecting to server', 'danger');
+    } finally {
+      els.syncButton.textContent = originalText;
       els.syncButton.disabled = false;
-      els.syncButton.textContent = 'Sync From Loyverse';
     }
   }
-}
 
-document.addEventListener('DOMContentLoaded', () => {
-  if (els.reportDate) {
-    els.reportDate.value = todayLocalDate();
-    els.reportDate.addEventListener('change', syncFromLoyverse);
+  if (els.syncButton) els.syncButton.addEventListener('click', syncFromLoyverse);
+  
+  if (els.saveButton) {
+    els.saveButton.addEventListener('click', () => showMessage('Report saved successfully (Simulation)'));
   }
-  if (els.syncButton) {
-    els.syncButton.addEventListener('click', syncFromLoyverse);
+  
+  if (els.printButton) {
+    els.printButton.addEventListener('click', () => window.print());
   }
+
+  if (els.loadButton) {
+    els.loadButton.addEventListener('click', () => showMessage('No saved reports found for this date', 'warning'));
+  }
+
   // Initial sync
   syncFromLoyverse();
 });
