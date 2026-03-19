@@ -453,6 +453,11 @@ function processBestBudsOrders(data) {
   const orders = Array.isArray(data.orders) ? data.orders : [];
   let totalDailyGrams = 0;
   const tableRows = [];
+  
+  // Payment Entries အသစ်အတွက် Array များ
+  const splitCashEntries = [];
+  const splitCardEntries = [];
+  const splitTransferEntries = [];
 
   orders.forEach(order => {
     let lineGram = 0;
@@ -461,39 +466,69 @@ function processBestBudsOrders(data) {
     let mainItemName = "";
 
     const items = order.line_items || order.items || [];
+    
+    // --- [1] Discount တွက်ချက်ခြင်း (Gram အပြည့်ရအောင်) ---
+    const orderTotalMoney = Number(order.total_money || 0); 
+    const orderDiscountMoney = Number(order.total_discount || 0);
+    const hasOrderDiscount = orderDiscountMoney > 0;
 
     items.forEach(item => {
       let itemName = String(item.name || item.item_name || "").toLowerCase();
       let category = String(item.category_name || "").toLowerCase();
-      let price = Number(item.price || 0);
-      let qty = Number(item.quantity || item.qty || 0);
-      let itemTotal = price * qty;
+      
+      // Gross price (discount မနှုတ်ခင် စျေး) ကို ယူမယ်
+      let grossPrice = Number(item.gross_total_money || item.total_money || (Number(item.price || 0) * Number(item.quantity || item.qty || 0))); 
+      
+      // Discount ရှိရင် Net Price ပြောင်းတွက်မယ်
+      let itemNetPrice = grossPrice;
+      if (hasOrderDiscount && orderTotalMoney > 0) {
+          itemNetPrice = grossPrice - (grossPrice / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
+      }
 
-      // 1. DISCOUNT OVERRIDES
-      if (itemName.includes('lemon cherry') && itemTotal === 4970) {
+      let qty = Number(item.quantity || item.qty || 0);
+
+      // --- [2] Lemon Cherry Override (7G Fix) ---
+      if (itemName.includes('lemon cherry') && grossPrice >= 4970) {
         qty = 7; 
       }
 
-      // 2. CATEGORIZATION
+      // --- [3] CATEGORIZATION ---
       let isAcc = ['accessories', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter']
                   .some(keyword => itemName.includes(keyword) || category.includes(keyword));
       
+      // 50 THB အောက်ဆိုရင် F&B ထဲ အလိုလို ထည့်မယ်
       let isFB = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk']
-                 .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || price <= 50;
+                 .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || (grossPrice / (qty || 1)) <= 50;
 
-      // 3. BEST BUDS LOGIC ROUTING
+      // --- [4] BEST BUDS ROUTING LOGIC ---
       if (isFB) {
-        fbPriceTotal += itemTotal; // ညာဘက်ရောက်မယ် (F&B)
+        fbPriceTotal += itemNetPrice; 
       } else if (isAcc) {
-        mainAndAccPrice += itemTotal; // ဘယ်ဘက်ရောက်မယ် (Accessories), Gram=0
+        mainAndAccPrice += itemNetPrice; 
       } else {
-        mainAndAccPrice += itemTotal; // ဘယ်ဘက်ရောက်မယ် (Main), Gram တွက်မယ်
-        lineGram += qty;
+        mainAndAccPrice += itemNetPrice; 
+        lineGram += qty; // Main Flower ဆိုမှ Gram ပေါင်းမယ်
         if (!mainItemName) mainItemName = item.name;
       }
     });
 
     totalDailyGrams += lineGram;
+    
+    // --- [5] Payment Details အတွက် Split string အစစ် ---
+    const splitFormat = `THB ${mainAndAccPrice.toFixed(2)} / ${fbPriceTotal.toFixed(2)}`;
+    
+    // ငွေပေးချေတဲ့ ပုံစံ (Cash, Card, Transfer) ကို ရှာမယ်
+    const tenderType = String(order.payment_type || (order.payments && order.payments[0]?.tender_type) || "CASH").toUpperCase();
+
+    if (tenderType === 'CASH') {
+        splitCashEntries.push(splitFormat);
+    } else if (tenderType === 'CARD') {
+        splitCardEntries.push(splitFormat);
+    } else {
+        splitTransferEntries.push(splitFormat);
+    }
+
+    // Table Row အတွက်
     tableRows.push({
       time: order.created_at || "",
       receiptNumber: order.receipt_number || "",
@@ -503,7 +538,13 @@ function processBestBudsOrders(data) {
     });
   });
 
-  return { totalDailyGrams, tableRows };
+  return { 
+    totalDailyGrams, 
+    tableRows, 
+    cashEntries: splitCashEntries, 
+    cardEntries: splitCardEntries, 
+    transferEntries: splitTransferEntries 
+  };
 }
 
 /**
@@ -516,7 +557,7 @@ function renderBestBudsReport(data) {
   const totalGramsEl = els.totalGramsValue;
   if (!tbody) return;
 
-  const { totalDailyGrams, tableRows } = processBestBudsOrders(data);
+  const { totalDailyGrams, tableRows, cashEntries, cardEntries, transferEntries } = processBestBudsOrders(data);
   const totalGrams = round2(totalDailyGrams);
 
   // Update total grams display
@@ -529,6 +570,17 @@ function renderBestBudsReport(data) {
       totalGramsEl.classList.remove('text-success');
       totalGramsEl.classList.add('text-muted');
     }
+  }
+
+  // Update Payment Details UI Boxes
+  if (els.cashEntriesList) {
+    els.cashEntriesList.innerHTML = cashEntries.map(entry => `<div>${entry}</div>`).join('');
+  }
+  if (els.cardEntriesList) {
+    els.cardEntriesList.innerHTML = cardEntries.map(entry => `<div>${entry}</div>`).join('');
+  }
+  if (els.transferEntriesList) {
+    els.transferEntriesList.innerHTML = transferEntries.map(entry => `<div>${entry}</div>`).join('');
   }
 
   tbody.innerHTML = '';
