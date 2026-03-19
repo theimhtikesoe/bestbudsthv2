@@ -19,7 +19,7 @@
       "use": "@vercel/static"
     },
     {
-      "src": "bestbuds-logo.jpg",
+      "src": "public/bestbuds-logo.png",
       "use": "@vercel/static"
     },
     {
@@ -41,8 +41,8 @@
       "dest": "/styles.css"
     },
     {
-      "src": "/bestbuds-logo.jpg",
-      "dest": "/bestbuds-logo.jpg"
+      "src": "/bestbuds-logo.png",
+      "dest": "/bestbuds-logo.png"
     },
     {
       "src": "/logo.jpg",
