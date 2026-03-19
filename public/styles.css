@@ -252,15 +252,21 @@ body {
 
 .detail-list {
   margin: 0;
-  padding: 10px 18px 14px 35px;
+  padding: 10px 18px 14px 18px;
   max-height: 230px;
   overflow-y: auto;
+  list-style: none;
 }
 
 .detail-list li {
-  padding: 2px 0;
+  padding: 4px 0;
   color: #3f3124;
   font-weight: 600;
+  border-bottom: 1px dashed rgba(177, 132, 73, 0.15);
+}
+
+.detail-list li:last-child {
+  border-bottom: none;
 }
 
 #reportsTable thead th {

@@ -53,31 +53,21 @@ function todayLocalDate() {
 }
 
 function parseNumber(value) {
-  if (value === null || value === undefined) {
-    return 0;
-  }
-
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : 0;
-  }
-
-  let normalized = String(value).trim();
-  if (normalized === '') {
-    return 0;
-  }
-
-  // Remove potential numbering prefixes like "1. ", "2. ", etc.
-  normalized = normalized.replace(/^\d+\.\s+/, '');
-  // Remove currency prefixes like "THB ", "฿ "
-  normalized = normalized.replace(/^(THB|฿)\s*/i, '');
-
-  if (/^-?\d+,\d+$/.test(normalized) && !normalized.includes('.')) {
-    normalized = normalized.replace(',', '.');
-  } else {
-    normalized = normalized.replace(/,/g, '');
-  }
-
-  const n = Number(normalized);
+  if (value === null || value === undefined) return 0;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+  
+  let str = String(value).trim();
+  if (str === '') return 0;
+  
+  // Clean up: remove everything except digits, dots, and minus sign
+  // This handles "1. 2050.00", "THB 2,050.00", etc.
+  // We want to keep the LAST numeric part if there are multiple (like "1. 2050.00")
+  const parts = str.match(/-?\d+(?:,\d+)*(?:\.\d+)?/g);
+  if (!parts || parts.length === 0) return 0;
+  
+  // Pick the last part which is usually the actual amount
+  let lastPart = parts[parts.length - 1].replace(/,/g, '');
+  const n = Number(lastPart);
   return Number.isFinite(n) ? n : 0;
 }
 
@@ -87,90 +77,6 @@ function hasValue(value) {
 
 function round2(value) {
   return Number((value || 0).toFixed(2));
-}
-
-function hasOwn(obj, key) {
-  return Boolean(obj) && Object.prototype.hasOwnProperty.call(obj, key);
-}
-
-function resolveOneKBillCount(report) {
-  if (hasOwn(report, '1k_qty')) {
-    return parseOneKBillCount(report['1k_qty']);
-  }
-
-  const explicitTotal = round2(parseNumber(report?.['1k_total']));
-  if (explicitTotal > 0) {
-    return Math.max(0, Math.round(explicitTotal / ONE_K_BILL_VALUE));
-  }
-
-  const legacySafeBoxAmount = round2(parseNumber(report?.safe_box_amount));
-  if (legacySafeBoxAmount > 0) {
-    return Math.max(0, Math.round(legacySafeBoxAmount / ONE_K_BILL_VALUE));
-  }
-
-  const date = normalizeDate(report?.date || els.reportDate.value);
-  if (date === '2026-02-20') {
-    return 7;
-  }
-
-  return 0;
-}
-
-function parseOneKBillCount(value) {
-  const parsed = Math.floor(parseNumber(value));
-  if (!Number.isFinite(parsed) || parsed < 0) {
-    return 0;
-  }
-  return parsed;
-}
-
-function oneKBillCountToAmount(count) {
-  return round2(parseOneKBillCount(count) * ONE_K_BILL_VALUE);
-}
-
-function formatOneKBillCount(count) {
-  const qty = parseOneKBillCount(count);
-  return String(qty);
-}
-
-function readOptionalQuantityById(ids = []) {
-  for (const id of ids) {
-    const input = document.getElementById(id);
-    if (input) {
-      return parseOneKBillCount(input.value);
-    }
-  }
-  return 0;
-}
-
-function calculateDenominationSummary() {
-  const oneKQty = parseOneKBillCount(els.oneKBillCount.value);
-  const oneKTotal = round2(oneKQty * ONE_K_BILL_VALUE);
-
-  let otherDenominationTotal = 0;
-  for (const [valueText, ids] of Object.entries(OPTIONAL_DENOMINATION_INPUTS)) {
-    const value = parseNumber(valueText);
-    const qty = readOptionalQuantityById(ids);
-    otherDenominationTotal += qty * value;
-  }
-
-  const actualCashCounted = round2(oneKTotal + otherDenominationTotal);
-  return {
-    oneKQty,
-    oneKTotal,
-    otherDenominationTotal: round2(otherDenominationTotal),
-    actualCashCounted
-  };
-}
-
-function setMessage(text, variant = 'info') {
-  els.message.textContent = text;
-  els.message.className = `alert alert-${variant}`;
-}
-
-function clearMessage() {
-  els.message.className = 'alert d-none';
-  els.message.textContent = '';
 }
 
 function formatCurrency(value) {
@@ -185,28 +91,15 @@ function formatCurrency(value) {
 function formatPercentage(value) {
   const normalized = round2(parseNumber(value));
   const clean = normalized % 1 === 0 ? String(normalized.toFixed(0)) : String(normalized.toFixed(2));
-  const trimmed = clean.includes('.') ? clean.replace(/\.?0+$/, '') : clean;
-  return `${trimmed}%`;
+  return `${clean.replace(/\.?0+$/, '')}%`;
 }
 
 function parsePercentage(value) {
-  if (value === null || value === undefined || value === '') {
-    return null;
-  }
-
-  let normalized = String(value).trim();
-  if (normalized.endsWith('%')) {
-    normalized = normalized.slice(0, -1);
-  }
-
-  const parsed = Number(normalized.replace(/,/g, ''));
-  if (!Number.isFinite(parsed) || parsed === 0) {
-    return null;
-  }
-
-  const absolute = Math.abs(parsed);
-  const percentage = absolute > 0 && absolute <= 1 ? absolute * 100 : absolute;
-  return round2(percentage);
+  if (value === null || value === undefined || value === '') return null;
+  let str = String(value).replace(/%/g, '').trim();
+  const n = Number(str.replace(/,/g, ''));
+  if (!Number.isFinite(n) || n === 0) return null;
+  return round2(Math.abs(n) > 0 && Math.abs(n) <= 1 ? n * 100 : n);
 }
 
 function formatTime(isoString) {
@@ -214,74 +107,31 @@ function formatTime(isoString) {
   try {
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return '';
-    
-    // Format to HH:mm (24-hour)
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
-  } catch (e) {
-    return '';
-  }
+    return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
+  } catch (e) { return ''; }
 }
 
 function normalizeEntries(entries) {
-  if (!Array.isArray(entries)) {
-    return [];
-  }
-
-  return entries
-    .map((entry) => {
-      let amount = 0;
-      let percentage = null;
-      let time = null;
-      let receiptNumber = null;
-
-      if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-        // Robust amount extraction from entry object
-        amount = 
-          entry.amount ?? 
-          entry.money_amount?.amount ?? 
-          entry.amount_money?.amount ?? 
-          entry.total_money?.amount ?? 
-          entry.money_amount ?? 
-          entry.amount_money ?? 
-          entry.total_money ?? 
-          0;
-        
-        percentage = parsePercentage(entry.percentage ?? entry.percent ?? entry.rate);
-        time = entry.time || null;
-        receiptNumber = entry.receiptNumber || entry.receipt_number || entry.number || null;
-      } else {
-        // Handle raw numbers or strings
-        let val = String(entry).trim();
-        // Clean up any numbering prefix if it's a string
-        val = val.replace(/^\d+\.\s+/, '');
-        amount = val;
-      }
-
-      return {
-        amount: round2(parseNumber(amount)),
-        percentage: percentage,
-        time: time,
-        receiptNumber: receiptNumber
-      };
-    })
-    .filter((entry) => Number.isFinite(entry.amount) && entry.amount > 0);
+  if (!Array.isArray(entries)) return [];
+  return entries.map(entry => {
+    let amount = 0, percentage = null, time = null, receiptNumber = null;
+    if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
+      amount = entry.amount ?? entry.money_amount?.amount ?? entry.amount_money?.amount ?? entry.total_money?.amount ?? 0;
+      percentage = parsePercentage(entry.percentage ?? entry.percent ?? entry.rate);
+      time = entry.time || null;
+      receiptNumber = entry.receiptNumber || entry.receipt_number || entry.number || null;
+    } else {
+      amount = entry;
+    }
+    return { amount: round2(parseNumber(amount)), percentage, time, receiptNumber };
+  }).filter(e => e.amount > 0);
 }
 
 function renderEntryList(listElement, entries, options = {}) {
-  const {
-    showPercentage = false,
-    percentageOnly = false,
-    percentageFallbackText = 'N/A%'
-  } = options;
-
-  if (!listElement) {
-    return;
-  }
-
+  if (!listElement) return;
+  const { showPercentage = false, percentageOnly = false, percentageFallbackText = 'N/A%' } = options;
+  
   listElement.innerHTML = '';
-
   if (!entries.length) {
     const li = document.createElement('li');
     li.className = 'text-muted';
@@ -290,738 +140,264 @@ function renderEntryList(listElement, entries, options = {}) {
     return;
   }
 
-  entries.forEach((entry) => {
+  entries.forEach(entry => {
     const li = document.createElement('li');
     const timeStr = entry.time ? `${formatTime(entry.time)} ` : '';
     const receiptStr = entry.receiptNumber ? `(${entry.receiptNumber}) ` : '';
     const detailStr = (timeStr || receiptStr) ? `${timeStr}${receiptStr}- ` : '';
-    console.log('Rendering entry:', entry, 'detailStr:', detailStr);
     
+    let content = '';
     if (showPercentage) {
       if (entry.percentage !== null) {
-        li.textContent = percentageOnly
-          ? `${detailStr}${formatPercentage(entry.percentage)}`
-          : `${detailStr}${formatPercentage(entry.percentage)} • ${formatCurrency(entry.amount)}`;
-      } else if (percentageOnly) {
-        li.textContent = `${detailStr}${percentageFallbackText}`;
+        content = percentageOnly ? `${detailStr}${formatPercentage(entry.percentage)}` : `${detailStr}${formatPercentage(entry.percentage)} • ${formatCurrency(entry.amount)}`;
       } else {
-        li.textContent = `${detailStr}${formatCurrency(entry.amount)}`;
+        content = percentageOnly ? `${detailStr}${percentageFallbackText}` : `${detailStr}${formatCurrency(entry.amount)}`;
       }
     } else {
-      li.textContent = `${detailStr}${formatCurrency(entry.amount)}`;
+      content = `${detailStr}${formatCurrency(entry.amount)}`;
     }
+    
+    // ENSURE NO EXTRA NUMBERING
+    li.textContent = content;
     listElement.appendChild(li);
   });
 }
 
-function applyPaymentDetails({ cash_entries, card_entries, transfer_entries, discount_entries, discount_entry_details, total_discount }) {
-  const cashEntries = normalizeEntries(cash_entries);
-  const cardEntries = normalizeEntries(card_entries);
-  const transferEntries = normalizeEntries(transfer_entries);
-  const discountEntries = normalizeEntries(
-    Array.isArray(discount_entry_details) && discount_entry_details.length
-      ? discount_entry_details
-      : discount_entries
-  );
+function applyPaymentDetails(data) {
+  const cashEntries = normalizeEntries(data.cash_entries);
+  const cardEntries = normalizeEntries(data.card_entries);
+  const transferEntries = normalizeEntries(data.transfer_entries);
+  const discountEntries = normalizeEntries(Array.isArray(data.discount_entry_details) && data.discount_entry_details.length ? data.discount_entry_details : data.discount_entries);
 
   renderEntryList(els.cashEntriesList, cashEntries);
   renderEntryList(els.cardEntriesList, cardEntries);
   renderEntryList(els.transferEntriesList, transferEntries);
-  renderEntryList(els.discountEntriesList, discountEntries, {
-    showPercentage: true,
-    percentageOnly: true
-  });
+  renderEntryList(els.discountEntriesList, discountEntries, { showPercentage: true, percentageOnly: true });
 
-  const cashTotal = cashEntries.reduce((sum, entry) => sum + entry.amount, 0);
-  const cardTotal = cardEntries.reduce((sum, entry) => sum + entry.amount, 0);
-  const transferTotal = transferEntries.reduce((sum, entry) => sum + entry.amount, 0);
-  const discountTotalFromEntries = discountEntries.reduce((sum, entry) => sum + entry.amount, 0);
-  const discountTotalFromApi = round2(parseNumber(total_discount));
-  const discountTotal = discountTotalFromApi > 0 ? discountTotalFromApi : discountTotalFromEntries;
+  const cashTotal = cashEntries.reduce((s, e) => s + e.amount, 0);
+  const cardTotal = cardEntries.reduce((s, e) => s + e.amount, 0);
+  const transferTotal = transferEntries.reduce((s, e) => s + e.amount, 0);
+  const discountTotal = round2(parseNumber(data.total_discount)) || discountEntries.reduce((s, e) => s + e.amount, 0);
 
-  if (els.cashEntriesTotal) {
-    els.cashEntriesTotal.textContent = formatCurrency(cashTotal);
-  }
-  if (els.cardEntriesTotal) {
-    els.cardEntriesTotal.textContent = formatCurrency(cardTotal);
-  }
-  if (els.transferEntriesTotal) {
-    els.transferEntriesTotal.textContent = formatCurrency(transferTotal);
-  }
-  if (els.discountEntriesTotal) {
-    els.discountEntriesTotal.textContent = formatCurrency(discountTotal);
-  }
-}
-
-function clearPaymentDetails() {
-  applyPaymentDetails({
-    cash_entries: [],
-    card_entries: [],
-    discount_entries: [],
-    discount_entry_details: [],
-    total_discount: 0
-  });
-}
-
-function getReportFileBaseName() {
-  const date = els.reportDate.value || todayLocalDate();
-  return `daily-report-${date}`.replace(/[^\w.-]+/g, '_');
-}
-
-function setButtonLoading(button, loadingText, isLoading) {
-  if (!button) {
-    return;
-  }
-
-  if (!button.dataset.defaultText) {
-    button.dataset.defaultText = button.textContent;
-  }
-
-  button.disabled = isLoading;
-  button.textContent = isLoading ? loadingText : button.dataset.defaultText;
-}
-
-async function captureReportSection() {
-  if (!els.reportSection) {
-    throw new Error('Report section not found.');
-  }
-
-  if (typeof window.html2canvas !== 'function') {
-    throw new Error('Export library is not loaded.');
-  }
-
-  return window.html2canvas(els.reportSection, {
-    backgroundColor: '#ffffff',
-    scale: 2,
-    useCORS: true,
-    ignoreElements: (element) => element.classList?.contains('no-export')
-  });
-}
-
-function createLandscapeCanvas(sourceCanvas) {
-  const padding = Math.max(Math.round(Math.max(sourceCanvas.width, sourceCanvas.height) * 0.03), 36);
-
-  let targetWidth = Math.max(sourceCanvas.width + padding * 2, 2600);
-  let targetHeight = Math.round(targetWidth / A4_LANDSCAPE_RATIO);
-
-  if (targetHeight < sourceCanvas.height + padding * 2) {
-    targetHeight = sourceCanvas.height + padding * 2;
-    targetWidth = Math.round(targetHeight * A4_LANDSCAPE_RATIO);
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = targetWidth;
-  canvas.height = targetHeight;
-
-  const context = canvas.getContext('2d');
-  if (!context) {
-    throw new Error('Failed to build export canvas.');
-  }
-
-  context.fillStyle = '#ffffff';
-  context.fillRect(0, 0, targetWidth, targetHeight);
-
-  const availableWidth = targetWidth - padding * 2;
-  const availableHeight = targetHeight - padding * 2;
-  const scale = Math.min(availableWidth / sourceCanvas.width, availableHeight / sourceCanvas.height);
-  const drawWidth = sourceCanvas.width * scale;
-  const drawHeight = sourceCanvas.height * scale;
-  const drawX = (targetWidth - drawWidth) / 2;
-  const drawY = (targetHeight - drawHeight) / 2;
-
-  context.drawImage(sourceCanvas, drawX, drawY, drawWidth, drawHeight);
-  return canvas;
-}
-
-function printReport() {
-  clearMessage();
-  window.print();
-}
-
-async function downloadReportAsImage() {
-  clearMessage();
-  setButtonLoading(els.downloadImageButton, 'Generating...', true);
-
-  try {
-    const capturedCanvas = await captureReportSection();
-    const landscapeCanvas = createLandscapeCanvas(capturedCanvas);
-    const link = document.createElement('a');
-    link.href = landscapeCanvas.toDataURL('image/png');
-    link.download = `${getReportFileBaseName()}.png`;
-    link.click();
-    setMessage('Landscape image downloaded successfully.', 'success');
-  } catch (error) {
-    setMessage(error.message || 'Failed to download image.', 'danger');
-  } finally {
-    setButtonLoading(els.downloadImageButton, 'Generating...', false);
-  }
-}
-
-async function downloadReportAsPdf() {
-  clearMessage();
-  setButtonLoading(els.downloadPdfButton, 'Generating...', true);
-
-  try {
-    if (!window.jspdf?.jsPDF) {
-      throw new Error('PDF library is not loaded.');
-    }
-
-    const capturedCanvas = await captureReportSection();
-    const landscapeCanvas = createLandscapeCanvas(capturedCanvas);
-    const imageData = landscapeCanvas.toDataURL('image/png');
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF('l', 'mm', 'a4');
-
-    const margin = 8;
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const contentWidth = pageWidth - margin * 2;
-    const contentHeight = pageHeight - margin * 2;
-    const imageRatio = landscapeCanvas.width / landscapeCanvas.height;
-    const contentRatio = contentWidth / contentHeight;
-
-    let renderWidth = contentWidth;
-    let renderHeight = contentHeight;
-
-    if (imageRatio > contentRatio) {
-      renderHeight = renderWidth / imageRatio;
-    } else {
-      renderWidth = renderHeight * imageRatio;
-    }
-
-    const renderX = (pageWidth - renderWidth) / 2;
-    const renderY = (pageHeight - renderHeight) / 2;
-    pdf.addImage(imageData, 'PNG', renderX, renderY, renderWidth, renderHeight, undefined, 'FAST');
-
-    pdf.save(`${getReportFileBaseName()}.pdf`);
-    setMessage('Landscape PDF downloaded successfully.', 'success');
-  } catch (error) {
-    setMessage(error.message || 'Failed to download PDF.', 'danger');
-  } finally {
-    setButtonLoading(els.downloadPdfButton, 'Generating...', false);
-  }
+  if (els.cashEntriesTotal) els.cashEntriesTotal.textContent = formatCurrency(cashTotal);
+  if (els.cardEntriesTotal) els.cardEntriesTotal.textContent = formatCurrency(cardTotal);
+  if (els.transferEntriesTotal) els.transferEntriesTotal.textContent = formatCurrency(transferTotal);
+  if (els.discountEntriesTotal) els.discountEntriesTotal.textContent = formatCurrency(discountTotal);
 }
 
 function recalculate() {
-  const oneKBillCount = parseOneKBillCount(els.oneKBillCount.value);
-  const oneKBillTotal = oneKBillCountToAmount(oneKBillCount);
-  const openingCash = parseNumber(els.openingCash.value);
-  const netSale = round2(parseNumber(els.netSale.value));
-  const cardTotal = parseNumber(els.cardTotal.value);
+  const oneKCount = parseOneKBillCount(els.oneKBillCount.value);
+  const oneKTotal = oneKCount * ONE_K_BILL_VALUE;
+  const opening = parseNumber(els.openingCash.value);
+  const net = round2(parseNumber(els.netSale.value));
+  const card = parseNumber(els.cardTotal.value);
+  const transfer = parseNumber(els.transferTotal.value);
   const expense = parseNumber(els.expense.value);
-  const actualCashCounted = parseNumber(els.actualCashCounted.value);
-  const expectedCash = round2(openingCash + netSale);
-  const outflowTotal = round2(oneKBillTotal + cardTotal + expense + actualCashCounted);
-  const difference = round2(expectedCash - outflowTotal);
+  const actual = parseNumber(els.actualCashCounted.value);
+  
+  const expected = round2(opening + net);
+  const outflow = round2(oneKTotal + card + transfer + expense + actual);
+  const diff = round2(expected - outflow);
 
-  els.expectedCash.value = expectedCash.toFixed(2);
-  els.difference.value = difference.toFixed(2);
-  if (els.safeBoxApplied) {
-    els.safeBoxApplied.value = `${formatOneKBillCount(oneKBillCount)} x 1,000 = ${formatCurrency(oneKBillTotal)}`;
-  }
+  els.expectedCash.value = expected.toFixed(2);
+  els.difference.value = diff.toFixed(2);
+  if (els.safeBoxApplied) els.safeBoxApplied.value = `${oneKCount} x 1,000 = ${formatCurrency(oneKTotal)}`;
 
   els.difference.classList.remove('diff-positive', 'diff-negative');
-  if (difference > 0) {
-    els.difference.classList.add('diff-positive');
-  } else if (difference < 0) {
-    els.difference.classList.add('diff-negative');
+  if (diff > 0) els.difference.classList.add('diff-positive');
+  else if (diff < 0) els.difference.classList.add('diff-negative');
+}
+
+function parseOneKBillCount(v) {
+  const n = Math.floor(parseNumber(v));
+  return n > 0 ? n : 0;
+}
+
+function formatOneKBillCount(c) { return String(parseOneKBillCount(c)); }
+
+function setButtonLoading(btn, text, isLoading) {
+  if (!btn) return;
+  btn.disabled = isLoading;
+  if (isLoading) {
+    btn.dataset.originalText = btn.textContent;
+    btn.textContent = text;
+  } else {
+    btn.textContent = btn.dataset.originalText || btn.textContent;
   }
 }
 
-function getReportPayload() {
-  const oneKQty = parseOneKBillCount(els.oneKBillCount.value);
-  const oneKTotal = oneKBillCountToAmount(oneKQty);
-  const actualCashCounted = parseNumber(els.actualCashCounted.value);
-  return {
-    date: els.reportDate.value,
-    cash_total: parseNumber(els.cashTotal.value),
-    card_total: parseNumber(els.cardTotal.value),
-    total_orders: parseInt(els.totalOrders.value || '0', 10),
-    expense: parseNumber(els.expense.value),
-    tip: parseNumber(els.tip.value),
-    '1k_qty': oneKQty,
-    '1k_total': oneKTotal,
-    safe_box_label: '1K Bill',
-    safe_box_amount: oneKTotal,
-    opening_cash: parseNumber(els.openingCash.value),
-    actual_cash_counted: actualCashCounted
-  };
+function setMessage(text, variant = 'info') {
+  els.message.textContent = text;
+  els.message.className = `alert alert-${variant}`;
 }
 
-function applyReportData(report) {
-  const oneKBillCount = resolveOneKBillCount(report);
-  els.cashTotal.value = round2(parseNumber(report.cash_total)).toFixed(2);
-  els.cardTotal.value = round2(parseNumber(report.card_total)).toFixed(2);
-  els.totalOrders.value = parseInt(report.total_orders || 0, 10);
-  els.netSale.value = round2(parseNumber(report.net_sale)).toFixed(2);
-  els.expense.value = round2(parseNumber(report.expense)).toFixed(2);
-  els.tip.value = round2(parseNumber(report.tip)).toFixed(2);
-  els.oneKBillCount.value = formatOneKBillCount(oneKBillCount);
-  els.openingCash.value = round2(parseNumber(report.opening_cash)).toFixed(2);
-  els.actualCashCounted.value = round2(parseNumber(report.actual_cash_counted)).toFixed(2);
-  recalculate();
+function clearMessage() {
+  els.message.className = 'alert d-none';
+  els.message.textContent = '';
 }
 
-function resetManualFields() {
+async function syncFromLoyverse() {
+  clearMessage();
+  if (!els.reportDate.value) return setMessage('Please choose a date.', 'warning');
+  setButtonLoading(els.syncButton, 'Syncing...', true);
+  try {
+    const res = await fetch(`/api/loyverse/sync?date=${els.reportDate.value}`, { cache: 'no-store' });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Sync failed');
+    applyPaymentDetails(data);
+    els.cashTotal.value = round2(data.cash_total).toFixed(2);
+    els.cardTotal.value = round2(data.card_total).toFixed(2);
+    if (els.transferTotal) els.transferTotal.value = round2(data.transfer_total).toFixed(2);
+    els.netSale.value = round2(data.net_sale).toFixed(2);
+    els.totalOrders.value = data.total_orders || 0;
+    recalculate();
+    setMessage('Synced successfully.', 'success');
+  } catch (e) { setMessage(e.message, 'danger'); }
+  finally { setButtonLoading(els.syncButton, '', false); }
+}
+
+async function loadSavedReport() {
+  clearMessage();
+  const date = els.reportDate.value;
+  if (!date) return;
+  try {
+    const res = await fetch(`/api/reports/${date}`);
+    if (res.status === 404) {
+      resetFields();
+      return setMessage('No saved report found.', 'secondary');
+    }
+    const report = await res.json();
+    els.cashTotal.value = round2(report.cash_total).toFixed(2);
+    els.cardTotal.value = round2(report.card_total).toFixed(2);
+    if (els.transferTotal) els.transferTotal.value = round2(report.transfer_total || 0).toFixed(2);
+    els.totalOrders.value = report.total_orders || 0;
+    els.netSale.value = round2(report.net_sale).toFixed(2);
+    els.expense.value = round2(report.expense).toFixed(2);
+    els.tip.value = round2(report.tip).toFixed(2);
+    els.oneKBillCount.value = report['1k_qty'] || 0;
+    els.openingCash.value = round2(report.opening_cash).toFixed(2);
+    els.actualCashCounted.value = round2(report.actual_cash_counted).toFixed(2);
+    
+    const syncRes = await fetch(`/api/loyverse/sync?date=${date}`);
+    if (syncRes.ok) applyPaymentDetails(await syncRes.json());
+    
+    recalculate();
+    setMessage('Report loaded.', 'success');
+  } catch (e) { setMessage(e.message, 'danger'); }
+}
+
+function resetFields() {
+  els.cashTotal.value = '0.00';
+  els.cardTotal.value = '0.00';
+  if (els.transferTotal) els.transferTotal.value = '0.00';
+  els.totalOrders.value = '0';
+  els.netSale.value = '0.00';
   els.expense.value = '0.00';
   els.tip.value = '0.00';
   els.oneKBillCount.value = '0';
   els.openingCash.value = '0.00';
   els.actualCashCounted.value = '0.00';
+  els.cashEntriesList.innerHTML = '';
+  els.cardEntriesList.innerHTML = '';
+  els.transferEntriesList.innerHTML = '';
+  els.discountEntriesList.innerHTML = '';
   recalculate();
-}
-
-function resetSyncedFields() {
-  els.cashTotal.value = '0.00';
-  els.cardTotal.value = '0.00';
-  els.totalOrders.value = '0';
-  els.netSale.value = '0.00';
-}
-
-function ensureManualInputsEnabled() {
-  [els.expense, els.tip, els.oneKBillCount, els.openingCash, els.actualCashCounted].forEach((input) => {
-    input.readOnly = false;
-    input.disabled = false;
-  });
-}
-
-function applySyncSummaryToFields(data) {
-  els.cashTotal.value = round2(parseNumber(data.cash_total)).toFixed(2);
-  els.cardTotal.value = round2(parseNumber(data.card_total)).toFixed(2);
-  if (els.transferTotal) {
-    els.transferTotal.value = round2(parseNumber(data.transfer_total)).toFixed(2);
-  }
-  els.netSale.value = round2(parseNumber(data.net_sale)).toFixed(2);
-  els.totalOrders.value = parseInt(data.total_orders || 0, 10);
-
-  if (parseNumber(data.unclassified_amount) > 0) {
-    els.unclassifiedHint.textContent =
-      `Unclassified payment amount: ${formatCurrency(data.unclassified_amount)} (not included in Cash/Card totals).`;
-  } else {
-    els.unclassifiedHint.textContent = '';
-  }
-
-  recalculate();
-}
-
-async function fetchLoyverseSummaryByDate(date) {
-  const response = await fetch(
-    `/api/loyverse/sync?date=${encodeURIComponent(date)}&_ts=${Date.now()}`,
-    {
-      cache: 'no-store',
-      headers: {
-        'Cache-Control': 'no-cache'
-      }
-    }
-  );
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Sync failed');
-  }
-
-  return data;
-}
-
-async function loadPaymentDetailsForDate(date, options = {}) {
-  const { updateSummary = false, silent = true } = options;
-
-  try {
-    const data = await fetchLoyverseSummaryByDate(date);
-    applyPaymentDetails(data);
-
-    if (updateSummary) {
-      applySyncSummaryToFields(data);
-    }
-
-    return data;
-  } catch (error) {
-    clearPaymentDetails();
-    if (!silent) {
-      throw error;
-    }
-    return null;
-  }
-}
-
-function normalizeDate(value) {
-  return String(value || '').slice(0, 10);
-}
-
-async function fetchSavedReportByDate(date) {
-  const response = await fetch(`/api/reports/${date}`);
-  if (response.status === 404) {
-    return null;
-  }
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.message || 'Failed to load report');
-  }
-
-  return response.json();
-}
-
-async function fillOpeningCashFromPreviousReport(date) {
-  const params = new URLSearchParams({
-    to: date,
-    limit: '100'
-  });
-
-  const response = await fetch(`/api/reports?${params.toString()}`);
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Failed to load previous report');
-  }
-
-  const rows = Array.isArray(data) ? data : [];
-  const previous = rows.find((row) => normalizeDate(row.date) < date);
-  if (!previous) {
-    return null;
-  }
-
-  const hasPreviousActualCash = hasValue(previous.actual_cash_counted);
-  const fallbackExpectedCash = hasValue(previous.expected_cash) ? previous.expected_cash : null;
-  const openingCashSource = hasPreviousActualCash ? previous.actual_cash_counted : fallbackExpectedCash;
-  if (openingCashSource === null) {
-    return null;
-  }
-
-  const openingCash = round2(parseNumber(openingCashSource));
-  els.openingCash.value = openingCash.toFixed(2);
-  recalculate();
-
-  return {
-    openingCash,
-    sourceDate: normalizeDate(previous.date),
-    sourceLabel: hasPreviousActualCash ? 'Actual Cash Counted' : 'Expected Cash'
-  };
-}
-
-async function loadReportForDate(date, options = {}) {
-  const { showMessage = true, carryForwardOpeningCash = true } = options;
-
-  ensureManualInputsEnabled();
-
-  if (!date) {
-    if (showMessage) {
-      setMessage('Please choose a report date first.', 'warning');
-    }
-    return null;
-  }
-
-  try {
-    const report = await fetchSavedReportByDate(date);
-    if (!report) {
-      resetSyncedFields();
-      resetManualFields();
-      clearPaymentDetails();
-
-      let carryForward = null;
-      if (carryForwardOpeningCash) {
-        carryForward = await fillOpeningCashFromPreviousReport(date);
-      }
-
-      if (showMessage) {
-        if (carryForward) {
-          setMessage(
-            `No saved report. Opening Cash auto-filled from ${carryForward.sourceDate} ${carryForward.sourceLabel}.`,
-            'secondary'
-          );
-        } else {
-          setMessage('No saved report found for this date.', 'secondary');
-        }
-      }
-
-      return null;
-    }
-
-    applyReportData(report);
-    await loadPaymentDetailsForDate(date, { updateSummary: false, silent: true });
-    if (showMessage) {
-      setMessage('Saved report loaded.', 'success');
-    }
-    return report;
-  } catch (error) {
-    if (showMessage) {
-      setMessage(error.message, 'danger');
-    }
-    throw error;
-  }
-}
-
-async function loadSavedReport() {
-  clearMessage();
-
-  try {
-    await loadReportForDate(els.reportDate.value, {
-      showMessage: true,
-      carryForwardOpeningCash: true
-    });
-  } catch (error) {
-    // message already handled in loadReportForDate
-  }
-}
-
-async function syncFromLoyverse() {
-  clearMessage();
-  ensureManualInputsEnabled();
-
-  if (!els.reportDate.value) {
-    setMessage('Please choose a report date first.', 'warning');
-    return;
-  }
-
-  els.syncButton.disabled = true;
-  els.syncButton.textContent = 'Syncing...';
-
-  try {
-    await loadPaymentDetailsForDate(els.reportDate.value, { updateSummary: true, silent: false });
-    setMessage('Loyverse data synced successfully.', 'success');
-  } catch (error) {
-    setMessage(error.message, 'danger');
-  } finally {
-    els.syncButton.disabled = false;
-    els.syncButton.textContent = 'Sync From Loyverse';
-  }
 }
 
 async function saveReport() {
-  clearMessage();
-
-  if (!els.reportDate.value) {
-    setMessage('Please choose a report date first.', 'warning');
-    return;
-  }
-
-  els.saveButton.disabled = true;
-  els.saveButton.textContent = 'Saving...';
-
+  if (!els.reportDate.value) return setMessage('Please choose a date.', 'warning');
+  setButtonLoading(els.saveButton, 'Saving...', true);
   try {
-    const payload = getReportPayload();
-
-    const response = await fetch('/api/reports', {
+    const payload = {
+      date: els.reportDate.value,
+      cash_total: parseNumber(els.cashTotal.value),
+      card_total: parseNumber(els.cardTotal.value),
+      transfer_total: els.transferTotal ? parseNumber(els.transferTotal.value) : 0,
+      total_orders: parseInt(els.totalOrders.value || '0', 10),
+      net_sale: parseNumber(els.netSale.value),
+      expense: parseNumber(els.expense.value),
+      tip: parseNumber(els.tip.value),
+      '1k_qty': parseOneKBillCount(els.oneKBillCount.value),
+      opening_cash: parseNumber(els.openingCash.value),
+      actual_cash_counted: parseNumber(els.actualCashCounted.value)
+    };
+    const res = await fetch('/api/reports', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data.message || 'Save failed');
-    }
-
-    applyReportData(data);
-    setMessage('Daily report saved successfully.', 'success');
-    await Promise.all([loadReportHistory(), loadNetSalesChart()]);
-  } catch (error) {
-    setMessage(error.message, 'danger');
-  } finally {
-    els.saveButton.disabled = false;
-    els.saveButton.textContent = 'Save Daily Report';
-  }
-}
-
-function renderReportsTable(reports) {
-  els.reportsTableBody.innerHTML = '';
-
-  if (!reports.length) {
-    const tr = document.createElement('tr');
-    tr.innerHTML = '<td colspan="10" class="text-center text-muted">No reports found</td>';
-    els.reportsTableBody.appendChild(tr);
-    return;
-  }
-
-  for (const report of reports) {
-    const tr = document.createElement('tr');
-    const reportDate = normalizeDate(report.date);
-    const oneKBillCount = resolveOneKBillCount(report);
-    const oneKBillTotal = hasOwn(report, '1k_total')
-      ? round2(parseNumber(report['1k_total']))
-      : oneKBillCountToAmount(oneKBillCount);
-    const openingCash = round2(parseNumber(report.opening_cash));
-    const netSale = round2(parseNumber(report.net_sale));
-    const cardTotal = round2(parseNumber(report.card_total));
-    const expense = round2(parseNumber(report.expense));
-    const actualCashCounted = round2(parseNumber(report.actual_cash_counted));
-    const expectedCash = round2(openingCash + netSale);
-    const outflowTotal = round2(oneKBillTotal + cardTotal + expense + actualCashCounted);
-    const difference = round2(expectedCash - outflowTotal);
-    tr.innerHTML = `
-      <td>${reportDate}</td>
-      <td>${formatCurrency(report.net_sale)}</td>
-      <td>${formatCurrency(report.cash_total)}</td>
-      <td>${formatCurrency(report.card_total)}</td>
-      <td>${parseInt(report.total_orders || 0, 10)}</td>
-      <td>${formatCurrency(report.expense)}</td>
-      <td>1K: ${formatOneKBillCount(oneKBillCount)} (${formatCurrency(oneKBillTotal)})</td>
-      <td>${formatCurrency(expectedCash)}</td>
-      <td class="${difference > 0 ? 'diff-positive' : difference < 0 ? 'diff-negative' : ''}">${formatCurrency(difference)}</td>
-      <td class="no-export">
-        <button type="button" class="btn btn-sm btn-outline-dark print-past-btn" data-date="${reportDate}">
-          Print
-        </button>
-      </td>
-    `;
-    els.reportsTableBody.appendChild(tr);
-  }
+    if (!res.ok) throw new Error('Save failed');
+    setMessage('Report saved.', 'success');
+    loadReportHistory();
+  } catch (e) { setMessage(e.message, 'danger'); }
+  finally { setButtonLoading(els.saveButton, '', false); }
 }
 
 async function loadReportHistory() {
-  const params = new URLSearchParams();
-  if (els.fromDate.value) {
-    params.set('from', els.fromDate.value);
-  }
-  if (els.toDate.value) {
-    params.set('to', els.toDate.value);
-  }
-
-  const query = params.toString() ? `?${params.toString()}` : '';
-  const response = await fetch(`/api/reports${query}`);
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Failed to load history');
-  }
-
-  renderReportsTable(data);
+  try {
+    const res = await fetch('/api/reports');
+    const data = await res.json();
+    els.reportsTableBody.innerHTML = '';
+    data.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${r.date}</td>
+        <td>${formatCurrency(r.net_sale)}</td>
+        <td>${formatCurrency(r.cash_total)}</td>
+        <td>${formatCurrency(r.card_total)}</td>
+        <td>${r.total_orders}</td>
+        <td>${formatCurrency(r.expense)}</td>
+        <td>${formatCurrency(r.safe_box_amount)}</td>
+        <td>${formatCurrency(r.expected_cash)}</td>
+        <td class="${r.difference > 0 ? 'diff-positive' : r.difference < 0 ? 'diff-negative' : ''}">${formatCurrency(r.difference)}</td>
+        <td><button class="btn btn-sm btn-outline-primary view-btn" data-date="${r.date}">View</button></td>
+      `;
+      els.reportsTableBody.appendChild(tr);
+    });
+  } catch (e) { console.error(e); }
 }
 
 async function loadNetSalesChart() {
-  const response = await fetch('/api/reports/last-7/net-sales');
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(data.message || 'Failed to load chart data');
-  }
-
-  const labels = data.map((item) => String(item.date).slice(0, 10));
-  const values = data.map((item) => round2(parseNumber(item.net_sale)));
-
-  const ctx = document.getElementById('netSalesChart');
-  if (chart) {
-    chart.destroy();
-  }
-
-  chart = new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels,
-      datasets: [
-        {
-          label: 'Net Sale',
-          data: values,
-          backgroundColor: '#0d6efd'
-        }
-      ]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      scales: {
-        y: {
-          beginAtZero: true
-        }
-      }
-    }
-  });
+  try {
+    const res = await fetch('/api/reports/last-7/net-sales');
+    const data = await res.json();
+    const ctx = document.getElementById('netSalesChart').getContext('2d');
+    if (chart) chart.destroy();
+    chart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: data.map(d => d.date),
+        datasets: [{ label: 'Net Sale', data: data.map(d => d.net_sale), backgroundColor: '#b6781e' }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+  } catch (e) { console.error(e); }
 }
 
 function bindEvents() {
-  document.querySelectorAll('.calc-input').forEach((input) => {
-    input.addEventListener('input', recalculate);
-  });
-  Object.values(OPTIONAL_DENOMINATION_INPUTS)
-    .flat()
-    .forEach((id) => {
-      const input = document.getElementById(id);
-      if (input) {
-        input.addEventListener('input', recalculate);
-      }
-    });
-
-  els.loadButton.addEventListener('click', loadSavedReport);
   els.syncButton.addEventListener('click', syncFromLoyverse);
   els.saveButton.addEventListener('click', saveReport);
-  els.printButton.addEventListener('click', printReport);
-  els.downloadImageButton.addEventListener('click', downloadReportAsImage);
-  els.downloadPdfButton.addEventListener('click', downloadReportAsPdf);
-  els.reportsTableBody.addEventListener('click', async (event) => {
-    const button = event.target.closest('.print-past-btn');
-    if (!button) {
-      return;
+  els.loadButton.addEventListener('click', loadSavedReport);
+  els.reportDate.addEventListener('change', loadSavedReport);
+  els.printButton.addEventListener('click', () => window.print());
+  
+  document.querySelectorAll('.calc-input').forEach(i => i.addEventListener('input', recalculate));
+  
+  els.reportsTableBody.addEventListener('click', e => {
+    if (e.target.classList.contains('view-btn')) {
+      els.reportDate.value = e.target.dataset.date;
+      loadSavedReport();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-
-    const reportDate = button.dataset.date;
-    if (!reportDate) {
-      return;
-    }
-
-    setButtonLoading(button, 'Loading...', true);
-    clearMessage();
-
-    try {
-      els.reportDate.value = reportDate;
-      const report = await loadReportForDate(reportDate, {
-        showMessage: false,
-        carryForwardOpeningCash: false
-      });
-
-      if (!report) {
-        throw new Error('Past report not found.');
-      }
-
-      printReport();
-    } catch (error) {
-      setMessage(error.message || 'Failed to print past report.', 'danger');
-    } finally {
-      setButtonLoading(button, 'Loading...', false);
-    }
-  });
-
-  els.filterReports.addEventListener('click', async () => {
-    try {
-      clearMessage();
-      await loadReportHistory();
-    } catch (error) {
-      setMessage(error.message, 'danger');
-    }
-  });
-
-  els.reportDate.addEventListener('change', async () => {
-    clearMessage();
-    els.unclassifiedHint.textContent = '';
-    await loadSavedReport();
   });
 }
 
-async function initializePage() {
+function init() {
   els.reportDate.value = todayLocalDate();
-  els.fromDate.value = dayjsOffset(-6);
-  els.toDate.value = todayLocalDate();
-
-  resetManualFields();
-  resetSyncedFields();
-  clearPaymentDetails();
-  ensureManualInputsEnabled();
-
   bindEvents();
-
-  try {
-    await Promise.all([loadSavedReport(), loadReportHistory(), loadNetSalesChart()]);
-  } catch (error) {
-    setMessage(error.message, 'danger');
-  }
+  loadSavedReport();
+  loadReportHistory();
+  loadNetSalesChart();
 }
 
-function dayjsOffset(days) {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  const tzOffset = date.getTimezoneOffset() * 60000;
-  return new Date(date - tzOffset).toISOString().slice(0, 10);
-}
-
-initializePage();
+init();
