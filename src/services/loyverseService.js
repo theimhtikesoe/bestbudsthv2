@@ -208,6 +208,154 @@ function isCompletedReceipt(receipt) {
   return completedStatuses.has(status);
 }
 
+function normalizeCategoryValue(rawCategory) {
+  return String(rawCategory || '').trim().toLowerCase();
+}
+
+function getReceiptIdentifier(receipt) {
+  return (
+    receipt.receipt_number ||
+    receipt.number ||
+    receipt.id ||
+    receipt.receipt_id ||
+    'unknown-receipt'
+  );
+}
+
+function extractLineItemCategory(lineItem) {
+  if (!lineItem || typeof lineItem !== 'object') {
+    return '';
+  }
+
+  if (Object.prototype.hasOwnProperty.call(lineItem, 'category')) {
+    return normalizeCategoryValue(lineItem.category);
+  }
+
+  return '';
+}
+
+function extractLineItemQty(lineItem) {
+  const qty =
+    lineItem?.quantity ??
+    lineItem?.qty ??
+    lineItem?.count ??
+    lineItem?.item_quantity ??
+    0;
+
+  const normalized = toNumber(qty);
+  return Number.isFinite(normalized) && normalized > 0 ? normalized : 0;
+}
+
+function extractLineItemPrice(lineItem) {
+  const directAmount =
+    lineItem?.total_money?.amount ??
+    lineItem?.total_price_money?.amount ??
+    lineItem?.line_total_money?.amount ??
+    lineItem?.gross_sales_money?.amount ??
+    lineItem?.subtotal_money?.amount ??
+    lineItem?.total ??
+    lineItem?.total_price ??
+    lineItem?.line_total ??
+    lineItem?.amount ??
+    null;
+
+  if (directAmount !== null && directAmount !== undefined) {
+    return normalizeMoney(directAmount);
+  }
+
+  const unitPrice =
+    lineItem?.price_money?.amount ??
+    lineItem?.unit_price_money?.amount ??
+    lineItem?.price ??
+    lineItem?.unit_price ??
+    0;
+
+  const qty = extractLineItemQty(lineItem);
+  return roundCurrency(normalizeMoney(unitPrice) * qty);
+}
+
+function buildAutomatedReceiptRow(receipt) {
+  const lineItems = receipt.line_items || receipt.items || [];
+  const receiptNumber = getReceiptIdentifier(receipt);
+  const time = receipt.created_at || receipt.receipt_date || null;
+  const strictCategoryRequired = String(process.env.LOYVERSE_STRICT_CATEGORY || 'false').toLowerCase() === 'true';
+
+  let totalGram = 0;
+  let numeratorPrice = 0;
+  let denominatorPrice = 0;
+  let netSales = 0;
+
+  for (let index = 0; index < lineItems.length; index += 1) {
+    const lineItem = lineItems[index];
+    const category = extractLineItemCategory(lineItem);
+
+    if (!category && strictCategoryRequired) {
+      throw new Error(
+        `Missing required category on receipt "${receiptNumber}" line item index ${index}`
+      );
+    }
+
+    const qty = extractLineItemQty(lineItem);
+    const price = extractLineItemPrice(lineItem);
+    const normalizedCategory = category || 'uncategorized';
+    const isFoodOrBeverage = normalizedCategory === 'soft drink' || normalizedCategory === 'snacks';
+    const isAccessory = normalizedCategory === 'accessories';
+    const isGroupA = !isFoodOrBeverage && !isAccessory;
+
+    if (isGroupA) {
+      totalGram += qty;
+      numeratorPrice += price;
+    } else if (isFoodOrBeverage) {
+      denominatorPrice += price;
+    } else if (isAccessory) {
+      numeratorPrice += price;
+    }
+
+    netSales += price;
+  }
+
+  return {
+    receipt_number: receiptNumber,
+    time,
+    gram_qty: roundCurrency(totalGram),
+    numerator_price: roundCurrency(numeratorPrice),
+    denominator_price: roundCurrency(denominatorPrice),
+    price_split: `${roundCurrency(numeratorPrice)} / ${roundCurrency(denominatorPrice)}`,
+    net_sales: roundCurrency(netSales)
+  };
+}
+
+function buildAutomatedReportRows(receipts) {
+  const rows = receipts.map(buildAutomatedReceiptRow);
+
+  const totals = rows.reduce(
+    (acc, row) => {
+      acc.total_gram_qty += toNumber(row.gram_qty);
+      acc.total_numerator_price += toNumber(row.numerator_price);
+      acc.total_denominator_price += toNumber(row.denominator_price);
+      acc.total_net_sales += toNumber(row.net_sales);
+      return acc;
+    },
+    {
+      total_gram_qty: 0,
+      total_numerator_price: 0,
+      total_denominator_price: 0,
+      total_net_sales: 0
+    }
+  );
+
+  return {
+    rows,
+    totals: {
+      total_gram_qty: roundCurrency(totals.total_gram_qty),
+      total_numerator_price: roundCurrency(totals.total_numerator_price),
+      total_denominator_price: roundCurrency(totals.total_denominator_price),
+      total_price_split: `${roundCurrency(totals.total_numerator_price)} / ${roundCurrency(totals.total_denominator_price)}`,
+      total_net_sales: roundCurrency(totals.total_net_sales)
+    }
+  };
+}
+
 function extractPaymentEntries(receipt, paymentTypeMap) {
   // Loyverse receipts typically have payments in receipt.payments
   const payments =
@@ -767,6 +915,27 @@ async function fetchSalesSummaryByDate(date) {
   totals.total_transfer = roundCurrency(totals.total_transfer);
   totals.total_discount = roundCurrency(totals.total_discount);
   totals.total_orders = closedReceipts.length;
+  let automatedReport = {
+    rows: [],
+    totals: {
+      total_gram_qty: 0,
+      total_numerator_price: 0,
+      total_denominator_price: 0,
+      total_price_split: '0 / 0',
+      total_net_sales: 0
+    },
+    error: null
+  };
+
+  try {
+    automatedReport = {
+      ...buildAutomatedReportRows(closedReceipts),
+      error: null
+    };
+  } catch (error) {
+    console.error('[Loyverse API] automated report build failed:', error.message);
+    automatedReport.error = error.message;
+  }
 
   const netSale = calculateNetSale({
     cash_total: totals.total_cash,
@@ -787,7 +956,10 @@ async function fetchSalesSummaryByDate(date) {
     transfer_entries: totals.transfer_entries,
     total_discount: totals.total_discount,
     discount_entries: totals.discount_entries,
-    discount_entry_details: totals.discount_entry_details
+    discount_entry_details: totals.discount_entry_details,
+    automated_report_rows: automatedReport.rows,
+    automated_report_totals: automatedReport.totals,
+    automated_report_error: automatedReport.error
   };
 }
 
