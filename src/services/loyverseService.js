@@ -78,6 +78,50 @@ async function fetchPaymentTypeMap() {
   }
 }
 
+/**
+ * Fetches all items from Loyverse and builds a Map of item_id -> category_name (lowercase).
+ * Falls back to empty Map on error so the rest of the report still works.
+ */
+async function fetchItemCategoryMap() {
+  try {
+    const items = [];
+    let cursor = null;
+    let pages = 0;
+    const MAX_PAGES = 20;
+
+    do {
+      const params = { limit: 250 };
+      if (cursor) params.cursor = cursor;
+
+      const response = await loyverseClient.get('/items', {
+        headers: getHeaders(),
+        params
+      });
+
+      const payload = response.data || {};
+      const pageItems = payload.items || payload.data || [];
+      items.push(...pageItems);
+      cursor = payload.cursor || null;
+      pages += 1;
+    } while (cursor && pages < MAX_PAGES);
+
+    const map = new Map();
+    for (const item of items) {
+      const id = item.id || item.item_id;
+      if (!id) continue;
+      // category_name is directly on item in Loyverse Items API
+      const categoryName = item.category_name || item.category || '';
+      map.set(id, String(categoryName).trim().toLowerCase());
+    }
+
+    console.log(`[Loyverse API] Item category map built: ${map.size} items`);
+    return map;
+  } catch (error) {
+    console.error('[Loyverse API] fetchItemCategoryMap failed:', error.message);
+    return new Map();
+  }
+}
+
 async function fetchClosedReceiptsByDate(date) {
   const { startIso, endIso } = getDateBounds(date);
   console.log(`[Loyverse API] Fetching receipts for date: ${date}`);
@@ -279,7 +323,7 @@ function extractLineItemPrice(lineItem) {
   return roundCurrency(normalizeMoney(unitPrice) * qty);
 }
 
-function buildAutomatedReceiptRow(receipt) {
+function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
   const lineItems = receipt.line_items || receipt.items || [];
   const receiptNumber = getReceiptIdentifier(receipt);
   const time = receipt.created_at || receipt.receipt_date || null;
@@ -292,7 +336,15 @@ function buildAutomatedReceiptRow(receipt) {
 
   for (let index = 0; index < lineItems.length; index += 1) {
     const lineItem = lineItems[index];
-    const category = extractLineItemCategory(lineItem);
+
+    // Priority: category_name on line_item → category on line_item → lookup via item_id in map
+    let category = extractLineItemCategory(lineItem);
+    if (!category) {
+      const itemId = lineItem.item_id || lineItem.id;
+      if (itemId && itemCategoryMap.has(itemId)) {
+        category = itemCategoryMap.get(itemId);
+      }
+    }
 
     if (!category && strictCategoryRequired) {
       throw new Error(
@@ -306,6 +358,8 @@ function buildAutomatedReceiptRow(receipt) {
     const isFoodOrBeverage = normalizedCategory === 'soft drink' || normalizedCategory === 'snacks';
     const isAccessory = normalizedCategory === 'accessories';
     const isGroupA = !isFoodOrBeverage && !isAccessory;
+
+    console.log(`[AutoReport] Receipt ${receiptNumber} item "${lineItem.item_name}" category="${normalizedCategory}" group=${isGroupA ? 'A' : isFoodOrBeverage ? 'B' : 'C'} qty=${qty} price=${price}`);
 
     if (isGroupA) {
       totalGram += qty;
@@ -330,8 +384,8 @@ function buildAutomatedReceiptRow(receipt) {
   };
 }
 
-function buildAutomatedReportRows(receipts) {
-  const rows = receipts.map(buildAutomatedReceiptRow);
+function buildAutomatedReportRows(receipts, itemCategoryMap = new Map()) {
+  const rows = receipts.map(receipt => buildAutomatedReceiptRow(receipt, itemCategoryMap));
 
   const totals = rows.reduce(
     (acc, row) => {
@@ -862,7 +916,10 @@ function extractDiscountEntriesFromReceipt(receipt) {
 }
 
 async function fetchSalesSummaryByDate(date) {
-  const paymentTypeMap = await fetchPaymentTypeMap();
+  const [paymentTypeMap, itemCategoryMap] = await Promise.all([
+    fetchPaymentTypeMap(),
+    fetchItemCategoryMap()
+  ]);
   const receipts = await fetchClosedReceiptsByDate(date);
   
   console.log(`[DEBUG] Total receipts fetched: ${receipts.length}`);
@@ -934,7 +991,7 @@ async function fetchSalesSummaryByDate(date) {
 
   try {
     automatedReport = {
-      ...buildAutomatedReportRows(closedReceipts),
+      ...buildAutomatedReportRows(closedReceipts, itemCategoryMap),
       error: null
     };
   } catch (error) {
