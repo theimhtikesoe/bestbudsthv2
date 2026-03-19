@@ -255,6 +255,7 @@ body {
   padding: 10px 18px 14px 34px;
   max-height: 230px;
   overflow-y: auto;
+  list-style: none;
 }
 
 .detail-list li {
