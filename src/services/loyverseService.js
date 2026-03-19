@@ -233,24 +233,20 @@ function extractPaymentEntries(receipt, paymentTypeMap) {
         .join(' ');
 
       // Most reliable way is to check nested amount fields first
-      let rawAmount = 0;
-      if (payment.money_amount && typeof payment.money_amount === 'object') {
-        rawAmount = payment.money_amount.amount;
-      } else if (payment.amount_money && typeof payment.amount_money === 'object') {
-        rawAmount = payment.amount_money.amount;
-      } else if (payment.total_money && typeof payment.total_money === 'object') {
-        rawAmount = payment.total_money.amount;
-      } else {
-        // Fallback to direct fields
-        rawAmount = 
-          payment.money_amount ?? 
-          payment.amount_money ?? 
-          payment.amount ?? 
-          payment.collected_money ?? 
-          payment.total_money ?? 
-          payment.value ?? 
-          0;
-      }
+      // Loyverse API returns amount as an integer in minor units (e.g., 100 for 1.00 THB)
+      // or as a decimal string depending on the version/endpoint.
+      // We check all possible nested amount fields.
+      const rawAmount = 
+        payment.money_amount?.amount ?? 
+        payment.amount_money?.amount ?? 
+        payment.total_money?.amount ?? 
+        payment.money_amount ?? 
+        payment.amount_money ?? 
+        payment.amount ?? 
+        payment.collected_money ?? 
+        payment.total_money ?? 
+        payment.value ?? 
+        0;
 
       return {
         paymentTypeLabel,
@@ -260,18 +256,13 @@ function extractPaymentEntries(receipt, paymentTypeMap) {
   }
 
   // If no payments array, fallback to receipt level fields
-  let fallbackAmount = 0;
-  if (receipt.total_money && typeof receipt.total_money === 'object') {
-    fallbackAmount = receipt.total_money.amount;
-  } else if (receipt.total_paid_money && typeof receipt.total_paid_money === 'object') {
-    fallbackAmount = receipt.total_paid_money.amount;
-  } else {
-    fallbackAmount = 
-      receipt.total_money ?? 
-      receipt.total ?? 
-      receipt.total_paid_money ?? 
-      0;
-  }
+  const fallbackAmount = 
+    receipt.total_money?.amount ?? 
+    receipt.total_paid_money?.amount ?? 
+    receipt.total_money ?? 
+    receipt.total ?? 
+    receipt.total_paid_money ?? 
+    0;
 
   return [
     {
