@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "outputDirectory": "public",
   "public": true,
   "builds": [
     {
@@ -7,23 +8,23 @@
       "use": "@vercel/node"
     },
     {
-      "src": "index.html",
+      "src": "**/*.html",
       "use": "@vercel/static"
     },
     {
-      "src": "app.js",
+      "src": "**/*.js",
       "use": "@vercel/static"
     },
     {
-      "src": "styles.css",
+      "src": "**/*.css",
       "use": "@vercel/static"
     },
     {
-      "src": "public/bestbuds-logo.png",
+      "src": "**/*.png",
       "use": "@vercel/static"
     },
     {
-      "src": "logo.jpg",
+      "src": "**/*.jpg",
       "use": "@vercel/static"
     }
   ],
