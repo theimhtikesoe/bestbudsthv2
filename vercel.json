@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "outputDirectory": "public",
   "public": true,
   "builds": [
     {
@@ -8,23 +7,23 @@
       "use": "@vercel/node"
     },
     {
-      "src": "**/*.html",
+      "src": "public/**/*.html",
       "use": "@vercel/static"
     },
     {
-      "src": "**/*.js",
+      "src": "public/**/*.js",
       "use": "@vercel/static"
     },
     {
-      "src": "**/*.css",
+      "src": "public/**/*.css",
       "use": "@vercel/static"
     },
     {
-      "src": "**/*.png",
+      "src": "public/**/*.png",
       "use": "@vercel/static"
     },
     {
-      "src": "**/*.jpg",
+      "src": "public/**/*.jpg",
       "use": "@vercel/static"
     }
   ],
@@ -34,24 +33,12 @@
       "dest": "api/server.js"
     },
     {
-      "src": "/app.js",
-      "dest": "/app.js"
-    },
-    {
-      "src": "/styles.css",
-      "dest": "/styles.css"
-    },
-    {
-      "src": "/bestbuds-logo.png",
-      "dest": "/bestbuds-logo.png"
-    },
-    {
-      "src": "/logo.jpg",
-      "dest": "/logo.jpg"
+      "src": "/",
+      "dest": "/public/index.html"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/public/$1"
     }
   ]
 }
