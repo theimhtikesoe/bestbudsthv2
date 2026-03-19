@@ -595,6 +595,7 @@ function extractDiscountEntriesFromReceipt(receipt) {
   const entries = [];
 
   const receiptDiscountLists = [
+    receipt.total_discounts,
     receipt.discounts,
     receipt.applied_discounts
   ];
