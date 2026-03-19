@@ -114,15 +114,6 @@ function parsePercentage(value) {
   // If the number is 0, return 0.
   if (n > 0 && n < 1) {
     return round2(n * 100);
-  } else if (n >= 1 && n <= 100) { // Assuming percentages are usually between 1 and 100
-    // If the number is 4, it should be 40%. So we need to multiply by 10 if it's a single digit number.
-    if (n >= 1 && n <= 9) {
-      return round2(n * 10);
-    } else {
-      return round2(n);
-    }
-  } else if (n > 100) { // If it's a very large number, it might be a decimal that was not multiplied by 100
-    return round2(n / 100); // Try dividing by 100 as a fallback
   } else {
     return round2(n);
   }
