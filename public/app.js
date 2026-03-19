@@ -222,64 +222,48 @@ function applyPaymentDetails(data) {
 }
 
 function processBestBudsData(items) {
-  let mainGram = 0;
+  let lineGram = 0;
   let mainAndAccPrice = 0;
-  let fbPrice = 0;
-  let itemName = '';
+  let fbPriceTotal = 0;
+  let mainItemName = '';
 
   const list = Array.isArray(items) ? items : [];
-  for (const item of list) {
-    const cat = String(item?.category || '').trim().toLowerCase();
-    const qty = round2(parseNumber(item?.qty ?? item?.quantity ?? 0));
-    const price = round2(parseNumber(item?.price ?? item?.unit_price ?? 0));
-    const total = round2(qty * price);
-    
-    // Calculate unit price for 3-Pole Logic
-    // If qty is 0, we use the total price as unit price
-    const unitPrice = qty > 0 ? price : total;
+  list.forEach(item => {
+    let itemName = String(item.name || item.item_name || "").toLowerCase();
+    let category = String(item.category_name || "").toLowerCase();
+    let price = Number(item.price || 0);
+    let qty = Number(item.quantity || item.qty || 0);
+    let itemTotal = price * qty;
 
-    // Final Master Codex Logic Implementation:
-    const itemNameLower = String(item?.name || item?.item_name || '').toLowerCase();
-
-    // Group C: Accessories (Left Side Price, 0 Grams)
-    const accessoryKeywords = ["plastic grinder", "hat", "shirt", "bong", "paper", "raw 1 1/4 size+tip", "lighter", "raw wide tip", "accessories"];
-    const isGroupC = accessoryKeywords.some(kw => itemNameLower.includes(kw)) || cat === 'accessories';
-    
-    // Group B: Edibles/F&B (Right Side Price, 0 Grams)
-    // F&B Right Side Check: Do NOT trigger isFB for the word "accessories"
-    const fbKeywords = ["gummy", "water", "soda", "snack", "thc gummy", "chicken karrage", "french fries", "french fire"];
-    const isGroupB = !isGroupC && (fbKeywords.some(kw => itemNameLower.includes(kw)) || cat === 'soft drink' || cat === 'snacks' || unitPrice <= 50);
-    
-    // Group A: Main Flower (Left Side Price, Count Grams)
-    const isGroupA = !isGroupB && !isGroupC && unitPrice > 50;
-
-    // Smart Gram Logic (7g Fix for Lemon Cherry Gelato)
-    let finalQty = qty;
-    if (itemNameLower.includes('lemon cherry gelato') && mainAndAccPrice === 4970) {
-      finalQty = 7;
+    // --- [1] HARDCODE FIX: Lemon Cherry Discount (Override to 7G) ---
+    if (itemName.includes('lemon cherry') && itemTotal === 4970) {
+      qty = 7;
     }
 
-    if (isGroupA) {
-      // Group A: Sum quantity into grams, add price to Left Side (Main+Acc)
-      mainGram += finalQty;
-      mainAndAccPrice += total;
-      if (!itemName) {
-        itemName = String(item?.name || item?.item_name || item?.variant_name || '').trim();
-      }
-    } else if (isGroupB) {
-      // Group B: DO NOT count as grams, add price to Right Side (F&B)
-      fbPrice += total;
-    } else if (isGroupC) {
-      // Group C: DO NOT count as grams, add price to Left Side (Main+Acc)
-      mainAndAccPrice += total;
+    // --- [2] Category သတ်မှတ်ခြင်း ---
+    let isAcc = category.includes('accessories') || itemName.includes('accessories') || itemName.includes('bong') || itemName.includes('paper') || itemName.includes('tip') || itemName.includes('grinder') || itemName.includes('shirt') || itemName.includes('hat');
+    let isFB = itemName.includes('gummy') || itemName.includes('water') || itemName.includes('soda') || price <= 50;
+
+    // --- [3] Best Buds Calculation (M/Acc VS F&B) ---
+    if (isFB || (isAcc && price <= 50)) {
+      // Group B: F&B (ဒါမှမဟုတ် 30 THB တန် Accessories အသေးစား) -> ညာဘက်ထားမယ်, Gram မပေါင်းဘူး
+      fbPriceTotal += itemTotal;
+    } else if (isAcc) {
+      // Group C: Real Accessories (>50 THB) -> ဘယ်ဘက်ထားမယ်, Gram မပေါင်းဘူး
+      mainAndAccPrice += itemTotal;
+    } else {
+      // Group A: Main Flower -> ဘယ်ဘက်ထားမယ်, Gram ပေါင်းမယ်
+      mainAndAccPrice += itemTotal;
+      lineGram += qty;
+      if (!mainItemName) mainItemName = item.name;
     }
-  }
+  });
 
   return {
-    mainGram: round2(mainGram),
+    mainGram: round2(lineGram),
     mainAndAccPrice: round2(mainAndAccPrice),
-    fbPrice: round2(fbPrice),
-    itemName: itemName || 'Accessories'
+    fbPrice: round2(fbPriceTotal),
+    itemName: mainItemName || 'Accessories'
   };
 }
 

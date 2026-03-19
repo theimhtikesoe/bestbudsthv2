@@ -31,10 +31,10 @@ function getDateBounds(date) {
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
   
   // Explicitly parse in the target timezone to avoid local server time interference
-  // Per User Requirement: Business day starts at 07:00:00 AM of the selected date
-  const startLocal = dayjs.tz(`${date} 07:00:00`, tz);
-  // And ends at 04:00:00 AM of the next day to include all late-night sales
-  const endLocal = startLocal.clone().add(1, 'day').hour(4).minute(0).second(0);
+  // Per User Requirement: Start at 00:00:00 of the selected date
+  const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
+  // And end at 00:00:25 of the next day (25-second midnight buffer)
+  const endLocal = startLocal.clone().add(1, 'day').second(25);
 
   if (!startLocal.isValid()) {
     throw new Error('Invalid date format. Use YYYY-MM-DD.');
