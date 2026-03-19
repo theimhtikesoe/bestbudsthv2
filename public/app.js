@@ -282,25 +282,24 @@ function renderEntryList(listElement, entries, options = {}) {
     return;
   }
 
-  entries.forEach((entry, index) => {
+  entries.forEach((entry) => {
     const li = document.createElement('li');
-    const prefix = `${index + 1}. `;
     const timeStr = entry.time ? `${formatTime(entry.time)} ` : '';
     const receiptStr = entry.receiptNumber ? `(${entry.receiptNumber}) ` : '';
-    const detailStr = `${timeStr}${receiptStr}- `;
+    const detailStr = (timeStr || receiptStr) ? `${timeStr}${receiptStr}- ` : '';
     
     if (showPercentage) {
       if (entry.percentage !== null) {
         li.textContent = percentageOnly
-          ? `${prefix}${detailStr}${formatPercentage(entry.percentage)}`
-          : `${prefix}${detailStr}${formatPercentage(entry.percentage)} • ${formatCurrency(entry.amount)}`;
+          ? `${detailStr}${formatPercentage(entry.percentage)}`
+          : `${detailStr}${formatPercentage(entry.percentage)} • ${formatCurrency(entry.amount)}`;
       } else if (percentageOnly) {
-        li.textContent = `${prefix}${detailStr}${percentageFallbackText}`;
+        li.textContent = `${detailStr}${percentageFallbackText}`;
       } else {
-        li.textContent = `${prefix}${detailStr}${formatCurrency(entry.amount)}`;
+        li.textContent = `${detailStr}${formatCurrency(entry.amount)}`;
       }
     } else {
-      li.textContent = `${prefix}${detailStr}${formatCurrency(entry.amount)}`;
+      li.textContent = `${detailStr}${formatCurrency(entry.amount)}`;
     }
     listElement.appendChild(li);
   });
