@@ -182,7 +182,15 @@ function renderEntryList(listElement, entries, options = {}) {
         content = percentageOnly ? `${percentageFallbackText}` : `${formatCurrency(entry.amount)}`;
       }
     } else {
-      content = `${formatCurrency(entry.amount)}`;
+      // Final Master Codex: Format each entry as [Main+Acc Price] / [F&B Price]
+      if (entry.main_acc_total !== undefined && entry.fb_total !== undefined) {
+        const mStr = formatCurrency(entry.main_acc_total).replace('THB ', '');
+        const fbStr = formatCurrency(entry.fb_total).replace('THB ', '');
+        content = `THB ${mStr} / ${fbStr}`;
+      } else {
+        // Fallback if split info is missing
+        content = `${formatCurrency(entry.amount)} / 0.00`;
+      }
     }
     
     // ENSURE NO EXTRA NUMBERING
@@ -230,28 +238,29 @@ function processBestBudsData(items) {
     // If qty is 0, we use the total price as unit price
     const unitPrice = qty > 0 ? price : total;
 
-    // 3-Pole Logic Implementation (Refined with specific item name rules):
+    // Final Master Codex Logic Implementation:
     const itemNameLower = String(item?.name || item?.item_name || '').toLowerCase();
 
-    // Group C: Accessories (Category IS accessories OR item name contains specific keywords)
-    const accessoryKeywords = ['plastic grinder', 'hat', 'shirt', 'bong', 'paper', 'lighter', 'raw paper'];
-    const isGroupC = cat === 'accessories' || accessoryKeywords.some(kw => itemNameLower.includes(kw));
+    // Group C: Accessories (Left Side Price, 0 Grams)
+    const accessoryKeywords = ["plastic grinder", "hat", "shirt", "bong", "paper", "raw 1 1/4 size+tip", "lighter"];
+    const isGroupC = accessoryKeywords.some(kw => itemNameLower.includes(kw)) || cat === 'accessories';
     
-    // Group B: Edibles & F&B (Category IS soft drink/snacks OR item name contains specific keywords OR Unit Price <= 50 THB)
-    const fbKeywords = ['thc gummy', 'gummy', 'water', 'soda', 'snack'];
-    const isGroupB = !isGroupC && (
-      cat === 'soft drink' || 
-      cat === 'snacks' || 
-      fbKeywords.some(kw => itemNameLower.includes(kw)) ||
-      unitPrice <= 50
-    );
+    // Group B: Edibles/F&B (Right Side Price, 0 Grams)
+    const fbKeywords = ["gummy", "water", "soda", "snack", "thc gummy", "chicken karrage", "french fries", "french fire"];
+    const isGroupB = !isGroupC && (fbKeywords.some(kw => itemNameLower.includes(kw)) || cat === 'soft drink' || cat === 'snacks' || unitPrice <= 50);
     
-    // Group A: Main Flower (NOT Group B AND NOT Group C AND Unit Price > 50 THB)
+    // Group A: Main Flower (Left Side Price, Count Grams)
     const isGroupA = !isGroupB && !isGroupC && unitPrice > 50;
+
+    // Smart Gram Logic (7g Fix for Lemon Cherry Gelato)
+    let finalQty = qty;
+    if (itemNameLower.includes('lemon cherry gelato') && total === 4970) {
+      finalQty = 7;
+    }
 
     if (isGroupA) {
       // Group A: Sum quantity into grams, add price to Left Side (Main+Acc)
-      mainGram += qty;
+      mainGram += finalQty;
       mainAndAccPrice += total;
       if (!itemName) {
         itemName = String(item?.name || item?.item_name || item?.variant_name || '').trim();

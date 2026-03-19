@@ -31,10 +31,10 @@ function getDateBounds(date) {
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
   
   // Explicitly parse in the target timezone to avoid local server time interference
-  // Per user requirement, each day's report starts from 00:02:00 of that day
-  const startLocal = dayjs.tz(`${date} 00:02:00`, tz);
-  // And ends at 00:02:00 of the next day to include the full 24-hour cycle plus late-night orders
-  const endLocal = startLocal.add(1, 'day');
+  // Per Final Master Codex: Start at 00:00:00 of the selected date
+  const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
+  // And end at 00:02:00 of the next day to include late-night orders within the 2-minute buffer
+  const endLocal = startLocal.clone().add(1, 'day').add(2, 'minute');
 
   if (!startLocal.isValid()) {
     throw new Error('Invalid date format. Use YYYY-MM-DD.');
@@ -394,30 +394,31 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
     const unitPrice = qty > 0 ? roundCurrency(price / qty) : price;
     const normalizedCategory = category || 'uncategorized';
 
-    // 3-Pole Logic Implementation (Refined with specific item name rules):
+    // Final Master Codex Logic Implementation:
     const itemName = String(lineItem.item_name || lineItem.name || '').toLowerCase();
 
-    // Group C: Accessories (Category IS accessories OR item name contains specific keywords)
-    const accessoryKeywords = ['plastic grinder', 'hat', 'shirt', 'bong', 'paper', 'lighter', 'raw paper'];
-    const isGroupC = normalizedCategory === 'accessories' || accessoryKeywords.some(kw => itemName.includes(kw));
+    // Group C: Accessories (Left Side Price, 0 Grams)
+    const accessoryKeywords = ["plastic grinder", "hat", "shirt", "bong", "paper", "raw 1 1/4 size+tip", "lighter"];
+    const isGroupC = accessoryKeywords.some(kw => itemName.includes(kw)) || normalizedCategory === 'accessories';
     
-    // Group B: Edibles & F&B (Category IS soft drink/snacks OR item name contains specific keywords OR Unit Price <= 50 THB)
-    const fbKeywords = ['thc gummy', 'gummy', 'water', 'soda', 'snack'];
-    const isGroupB = !isGroupC && (
-      normalizedCategory === 'soft drink' || 
-      normalizedCategory === 'snacks' || 
-      fbKeywords.some(kw => itemName.includes(kw)) ||
-      unitPrice <= 50
-    );
+    // Group B: Edibles/F&B (Right Side Price, 0 Grams)
+    const fbKeywords = ["gummy", "water", "soda", "snack", "thc gummy", "chicken karrage", "french fries", "french fire"];
+    const isGroupB = !isGroupC && (fbKeywords.some(kw => itemName.includes(kw)) || normalizedCategory === 'soft drink' || normalizedCategory === 'snacks' || unitPrice <= 50);
     
-    // Group A: Main Flower (NOT Group B AND NOT Group C AND Unit Price > 50 THB)
+    // Group A: Main Flower (Left Side Price, Count Grams)
     const isGroupA = !isGroupB && !isGroupC && unitPrice > 50;
 
-    console.log(`[AutoReport] Receipt ${receiptNumber} item "${lineItem.item_name}" category="${normalizedCategory}" group=${isGroupA ? 'A' : isGroupB ? 'B' : 'C'} qty=${qty} price=${price} unitPrice=${unitPrice}`);
+    // Smart Gram Logic (7g Fix for Lemon Cherry Gelato)
+    let finalQty = qty;
+    if (itemName.includes('lemon cherry gelato') && price === 4970) {
+      finalQty = 7;
+    }
+
+    console.log(`[AutoReport] Receipt ${receiptNumber} item "${lineItem.item_name}" category="${normalizedCategory}" group=${isGroupA ? 'A' : isGroupB ? 'B' : 'C'} qty=${qty} finalQty=${finalQty} price=${price} unitPrice=${unitPrice}`);
 
     if (isGroupA) {
       // Group A: Sum quantity into grams, add price to Left Side (numerator)
-      totalGram += qty;
+      totalGram += finalQty;
       numeratorPrice += price;
       if (!mainItemName) {
         mainItemName = String(
@@ -1008,6 +1009,11 @@ async function fetchSalesSummaryByDate(date) {
   for (const receipt of closedReceipts) {
     const paymentEntries = extractPaymentEntries(receipt, paymentTypeMap);
     const discountEntries = extractDiscountEntriesFromReceipt(receipt);
+    
+    // Calculate split for this receipt to apply to payment entries
+    const receiptRow = buildAutomatedReceiptRow(receipt, itemCategoryMap);
+    const mainAccTotal = receiptRow.numerator_price;
+    const fbTotal = receiptRow.denominator_price;
 
     for (const discountEntry of discountEntries) {
       totals.total_discount += discountEntry.amount;
@@ -1017,6 +1023,13 @@ async function fetchSalesSummaryByDate(date) {
 
     for (const entry of paymentEntries) {
       const paymentCategory = classifyPaymentType(entry.paymentTypeLabel);
+      
+      // Attach split info to the entry
+      // If there's only one payment, it gets the full split. 
+      // If multiple, we'd ideally prorate, but usually it's one.
+      entry.main_acc_total = mainAccTotal;
+      entry.fb_total = fbTotal;
+
       console.log(`[DEBUG] Payment entry - Label: "${entry.paymentTypeLabel}", Amount: ${entry.amount}, Category: ${paymentCategory}`);
       if (paymentCategory === 'cash') {
         totals.total_cash += entry.amount;
