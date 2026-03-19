@@ -94,7 +94,9 @@ function parsePercentage(value) {
   let str = String(value).replace(/%/g, '').trim();
   const n = Number(str.replace(/,/g, ''));
   if (!Number.isFinite(n) || n === 0) return null;
-  return round2(Math.abs(n) > 0 && Math.abs(n) <= 1 ? n * 100 : n);
+  // If the number is between 0 and 1 (exclusive of 0), assume it's a decimal representation and multiply by 100.
+  // Otherwise, assume it's already a percentage value.
+  return round2(Math.abs(n) > 0 && Math.abs(n) < 1 ? n * 100 : n);
 }
 
 function formatTime(isoString) {
