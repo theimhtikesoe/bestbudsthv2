@@ -139,17 +139,17 @@ function renderEntryList(listElement, entries, options = {}) {
     const li = document.createElement('li');
     const timeStr = entry.time ? `${formatTime(entry.time)} ` : '';
     const receiptStr = entry.receiptNumber ? `(${entry.receiptNumber}) ` : '';
-    const detailStr = (timeStr || receiptStr) ? `${timeStr}${receiptStr}- ` : '';
+    const detailStr = "";
     
     let content = '';
     if (showPercentage) {
       if (entry.percentage !== null) {
-        content = percentageOnly ? `${detailStr}${formatPercentage(entry.percentage)}` : `${detailStr}${formatPercentage(entry.percentage)} • ${formatCurrency(entry.amount)}`;
+        content = percentageOnly ? `${formatPercentage(entry.percentage)}` : `${formatPercentage(entry.percentage)} • ${formatCurrency(entry.amount)}`;
       } else {
-        content = percentageOnly ? `${detailStr}${percentageFallbackText}` : `${detailStr}${formatCurrency(entry.amount)}`;
+        content = percentageOnly ? `${percentageFallbackText}` : `${formatCurrency(entry.amount)}`;
       }
     } else {
-      content = `${detailStr}${formatCurrency(entry.amount)}`;
+      content = `${formatCurrency(entry.amount)}`;
     }
     
     // ENSURE NO EXTRA NUMBERING
