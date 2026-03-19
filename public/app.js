@@ -450,19 +450,60 @@ async function saveReport() {
  *   { g, priceDisplay, receiptNumber, time }
  */
 function processBestBudsOrders(data) {
-  const rows = (data && data.automated_report_rows) ? data.automated_report_rows : [];
-  return rows.map(row => {
-    const g = round2(parseNumber(row.gram_qty));
-    const numerator = round2(parseNumber(row.numerator_price));
-    const denominator = round2(parseNumber(row.denominator_price));
-    const priceDisplay = `${formatCurrency(numerator)} / ${formatCurrency(denominator)}`;
-    return {
-      g,
-      priceDisplay,
-      receiptNumber: row.receipt_number || '',
-      time: row.time || ''
-    };
+  const orders = Array.isArray(data.orders) ? data.orders : [];
+  let totalDailyGrams = 0;
+  const tableRows = [];
+
+  orders.forEach(order => {
+    let lineGram = 0;
+    let mainAndAccPrice = 0;
+    let fbPriceTotal = 0;
+    let mainItemName = "";
+
+    const items = order.line_items || order.items || [];
+
+    items.forEach(item => {
+      let itemName = String(item.name || item.item_name || "").toLowerCase();
+      let category = String(item.category_name || "").toLowerCase();
+      let price = Number(item.price || 0);
+      let qty = Number(item.quantity || item.qty || 0);
+      let itemTotal = price * qty;
+
+      // 1. DISCOUNT OVERRIDES
+      if (itemName.includes('lemon cherry') && itemTotal === 4970) {
+        qty = 7; 
+      }
+
+      // 2. CATEGORIZATION
+      let isAcc = ['accessories', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter']
+                  .some(keyword => itemName.includes(keyword) || category.includes(keyword));
+      
+      let isFB = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk']
+                 .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || price <= 50;
+
+      // 3. BEST BUDS LOGIC ROUTING
+      if (isFB) {
+        fbPriceTotal += itemTotal; // ညာဘက်ရောက်မယ် (F&B)
+      } else if (isAcc) {
+        mainAndAccPrice += itemTotal; // ဘယ်ဘက်ရောက်မယ် (Accessories), Gram=0
+      } else {
+        mainAndAccPrice += itemTotal; // ဘယ်ဘက်ရောက်မယ် (Main), Gram တွက်မယ်
+        lineGram += qty;
+        if (!mainItemName) mainItemName = item.name;
+      }
+    });
+
+    totalDailyGrams += lineGram;
+    tableRows.push({
+      time: order.created_at || "",
+      receiptNumber: order.receipt_number || "",
+      g: lineGram,
+      name: mainItemName || (mainAndAccPrice > 0 ? "Accessories" : "F&B/Misc"),
+      priceDisplay: `${mainAndAccPrice.toFixed(2)} / ${fbPriceTotal.toFixed(2)}`
+    });
   });
+
+  return { totalDailyGrams, tableRows };
 }
 
 /**
@@ -475,9 +516,8 @@ function renderBestBudsReport(data) {
   const totalGramsEl = els.totalGramsValue;
   if (!tbody) return;
 
-  const orders = processBestBudsOrders(data);
-  const totals = (data && data.automated_report_totals) ? data.automated_report_totals : {};
-  const totalGrams = round2(parseNumber(totals.total_gram_qty || 0));
+  const { totalDailyGrams, tableRows } = processBestBudsOrders(data);
+  const totalGrams = round2(totalDailyGrams);
 
   // Update total grams display
   if (totalGramsEl) {
@@ -493,14 +533,14 @@ function renderBestBudsReport(data) {
 
   tbody.innerHTML = '';
 
-  if (!orders.length) {
+  if (!tableRows.length) {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td colspan="4" class="text-muted text-center">-</td>`;
     tbody.appendChild(tr);
     return;
   }
 
-  orders.forEach((order, idx) => {
+  tableRows.forEach((order, idx) => {
     const tr = document.createElement('tr');
     const timeStr = order.time ? formatTime(order.time) : '-';
     const gramClass = order.g > 0 ? 'text-success fw-bold' : 'text-muted';
