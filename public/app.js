@@ -15,6 +15,7 @@ const els = {
   cardTotal: document.getElementById('cardTotal'),
   totalOrders: document.getElementById('totalOrders'),
   netSale: document.getElementById('netSale'),
+  totalGramsSold: document.getElementById('totalGramsSold'),
 
 
 
@@ -32,6 +33,7 @@ const els = {
   transferTotal: document.getElementById('transferTotal'),
   transferEntriesList: document.getElementById('transferEntriesList'),
   transferEntriesTotal: document.getElementById('transferEntriesTotal'),
+  bestBudsSalesBody: document.getElementById('bestBudsSalesBody'),
 
   unclassifiedHint: document.getElementById('unclassifiedHint')
 };
@@ -89,6 +91,10 @@ function formatPercentage(value) {
     return `${normalized.toFixed(0)}%`;
   }
   return `${normalized.toFixed(2).replace(/0+$/, '')}%`;
+}
+
+function formatGram(value) {
+  return `${round2(parseNumber(value)).toFixed(3)} G`;
 }
 
 function parsePercentage(value) {
@@ -204,6 +210,82 @@ function applyPaymentDetails(data) {
   if (els.discountEntriesTotal) els.discountEntriesTotal.textContent = formatCurrency(discountTotal);
 }
 
+function processBestBudsData(items) {
+  let mainGram = 0;
+  let mainAndAccPrice = 0;
+  let fbPrice = 0;
+  let itemName = '';
+
+  const list = Array.isArray(items) ? items : [];
+  for (const item of list) {
+    const cat = String(item?.category || '').trim().toLowerCase();
+    const qty = round2(parseNumber(item?.qty ?? item?.quantity ?? 0));
+    const price = round2(parseNumber(item?.price ?? item?.unit_price ?? 0));
+    const total = round2(qty * price);
+
+    if (cat === 'soft drink' || cat === 'snacks') {
+      fbPrice += total;
+    } else if (cat === 'accessories') {
+      mainAndAccPrice += total;
+    } else {
+      mainAndAccPrice += total;
+      mainGram += qty;
+      if (!itemName) {
+        itemName = String(item?.name || item?.item_name || item?.variant_name || '').trim();
+      }
+    }
+  }
+
+  return {
+    mainGram: round2(mainGram),
+    mainAndAccPrice: round2(mainAndAccPrice),
+    fbPrice: round2(fbPrice),
+    itemName: itemName || 'Accessories'
+  };
+}
+
+function normalizeBestBudsRows(data) {
+  const automatedRows = Array.isArray(data.automated_report_rows) ? data.automated_report_rows : [];
+  if (automatedRows.length > 0) {
+    return automatedRows.map((row) => ({
+      mainGram: round2(parseNumber(row.gram_qty)),
+      itemName: String(row.item_name || 'Accessories'),
+      mainAndAccPrice: round2(parseNumber(row.numerator_price)),
+      fbPrice: round2(parseNumber(row.denominator_price))
+    }));
+  }
+
+  const rawOrders = Array.isArray(data.orders) ? data.orders : [];
+  return rawOrders.map((order) => processBestBudsData(order.items));
+}
+
+function renderBestBudsTable(data) {
+  if (!els.bestBudsSalesBody) return;
+  const rows = normalizeBestBudsRows(data);
+
+  els.bestBudsSalesBody.innerHTML = '';
+  if (!rows.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="3" class="text-muted text-center py-3">-</td>';
+    els.bestBudsSalesBody.appendChild(tr);
+  } else {
+    rows.forEach((row) => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="gram-value">${round2(row.mainGram).toFixed(3)}</td>
+        <td>${row.itemName || 'Accessories'}</td>
+        <td class="text-end price-split">${round2(row.mainAndAccPrice).toFixed(2)} / ${round2(row.fbPrice).toFixed(2)}</td>
+      `;
+      els.bestBudsSalesBody.appendChild(tr);
+    });
+  }
+
+  const totalGram = rows.reduce((sum, row) => sum + parseNumber(row.mainGram), 0);
+  if (els.totalGramsSold) {
+    els.totalGramsSold.textContent = formatGram(totalGram);
+  }
+}
+
 
 
 
@@ -240,6 +322,7 @@ async function syncFromLoyverse() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'Sync failed');
     applyPaymentDetails(data);
+    renderBestBudsTable(data);
     els.cashTotal.value = round2(data.cash_total).toFixed(2);
     els.cardTotal.value = round2(data.card_total).toFixed(2);
     if (els.transferTotal) els.transferTotal.value = round2(data.transfer_total).toFixed(2);
@@ -258,6 +341,7 @@ function resetFields() {
   if (els.transferTotal) els.transferTotal.value = '0.00';
   els.totalOrders.value = '0';
   els.netSale.value = '0.00';
+  if (els.totalGramsSold) els.totalGramsSold.textContent = formatGram(0);
   els.expense.value = '0.00';
   els.tip.value = '0.00';
   els.oneKBillCount.value = '0';
@@ -267,6 +351,9 @@ function resetFields() {
   els.cardEntriesList.innerHTML = '';
   els.transferEntriesList.innerHTML = '';
   els.discountEntriesList.innerHTML = '';
+  if (els.bestBudsSalesBody) {
+    els.bestBudsSalesBody.innerHTML = '<tr><td colspan="3" class="text-muted text-center py-3">-</td></tr>';
+  }
   recalculate();
 }
 
