@@ -242,10 +242,11 @@ function processBestBudsData(items) {
     const itemNameLower = String(item?.name || item?.item_name || '').toLowerCase();
 
     // Group C: Accessories (Left Side Price, 0 Grams)
-    const accessoryKeywords = ["plastic grinder", "hat", "shirt", "bong", "paper", "raw 1 1/4 size+tip", "lighter"];
+    const accessoryKeywords = ["plastic grinder", "hat", "shirt", "bong", "paper", "raw 1 1/4 size+tip", "lighter", "raw wide tip", "accessories"];
     const isGroupC = accessoryKeywords.some(kw => itemNameLower.includes(kw)) || cat === 'accessories';
     
     // Group B: Edibles/F&B (Right Side Price, 0 Grams)
+    // F&B Right Side Check: Do NOT trigger isFB for the word "accessories"
     const fbKeywords = ["gummy", "water", "soda", "snack", "thc gummy", "chicken karrage", "french fries", "french fire"];
     const isGroupB = !isGroupC && (fbKeywords.some(kw => itemNameLower.includes(kw)) || cat === 'soft drink' || cat === 'snacks' || unitPrice <= 50);
     
@@ -254,7 +255,7 @@ function processBestBudsData(items) {
 
     // Smart Gram Logic (7g Fix for Lemon Cherry Gelato)
     let finalQty = qty;
-    if (itemNameLower.includes('lemon cherry gelato') && total === 4970) {
+    if (itemNameLower.includes('lemon cherry gelato') && mainAndAccPrice === 4970) {
       finalQty = 7;
     }
 

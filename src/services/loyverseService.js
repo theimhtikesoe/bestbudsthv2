@@ -31,10 +31,10 @@ function getDateBounds(date) {
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
   
   // Explicitly parse in the target timezone to avoid local server time interference
-  // Per Final Master Codex: Start at 00:00:00 of the selected date
-  const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
-  // And end at 00:02:00 of the next day to include late-night orders within the 2-minute buffer
-  const endLocal = startLocal.clone().add(1, 'day').add(2, 'minute');
+  // Per User Requirement: Business day starts at 07:00:00 AM of the selected date
+  const startLocal = dayjs.tz(`${date} 07:00:00`, tz);
+  // And ends at 04:00:00 AM of the next day to include all late-night sales
+  const endLocal = startLocal.clone().add(1, 'day').hour(4).minute(0).second(0);
 
   if (!startLocal.isValid()) {
     throw new Error('Invalid date format. Use YYYY-MM-DD.');
@@ -398,10 +398,11 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
     const itemName = String(lineItem.item_name || lineItem.name || '').toLowerCase();
 
     // Group C: Accessories (Left Side Price, 0 Grams)
-    const accessoryKeywords = ["plastic grinder", "hat", "shirt", "bong", "paper", "raw 1 1/4 size+tip", "lighter"];
+    const accessoryKeywords = ["plastic grinder", "hat", "shirt", "bong", "paper", "raw 1 1/4 size+tip", "lighter", "raw wide tip", "accessories"];
     const isGroupC = accessoryKeywords.some(kw => itemName.includes(kw)) || normalizedCategory === 'accessories';
     
     // Group B: Edibles/F&B (Right Side Price, 0 Grams)
+    // F&B Right Side Check: Do NOT trigger isFB for the word "accessories"
     const fbKeywords = ["gummy", "water", "soda", "snack", "thc gummy", "chicken karrage", "french fries", "french fire"];
     const isGroupB = !isGroupC && (fbKeywords.some(kw => itemName.includes(kw)) || normalizedCategory === 'soft drink' || normalizedCategory === 'snacks' || unitPrice <= 50);
     
@@ -410,7 +411,7 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
 
     // Smart Gram Logic (7g Fix for Lemon Cherry Gelato)
     let finalQty = qty;
-    if (itemName.includes('lemon cherry gelato') && price === 4970) {
+    if (itemName.includes('lemon cherry gelato') && numeratorPrice === 4970) {
       finalQty = 7;
     }
 
