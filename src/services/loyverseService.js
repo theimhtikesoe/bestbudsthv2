@@ -79,11 +79,39 @@ async function fetchPaymentTypeMap() {
 }
 
 /**
+ * Fetches all categories from Loyverse and returns a Map of category_id -> category_name (lowercase).
+ */
+async function fetchCategoryIdNameMap() {
+  try {
+    const response = await loyverseClient.get('/categories', {
+      headers: getHeaders()
+    });
+    const categories = response.data?.categories || response.data?.data || [];
+    const map = new Map();
+    for (const cat of categories) {
+      const id = cat.id || cat.category_id;
+      const name = cat.name || cat.category_name || '';
+      if (id) map.set(id, String(name).trim().toLowerCase());
+    }
+    console.log(`[Loyverse API] Category id->name map built: ${map.size} categories`);
+    return map;
+  } catch (error) {
+    console.error('[Loyverse API] fetchCategoryIdNameMap failed:', error.message);
+    return new Map();
+  }
+}
+
+/**
  * Fetches all items from Loyverse and builds a Map of item_id -> category_name (lowercase).
+ * Uses category_id -> category_name map to resolve names.
  * Falls back to empty Map on error so the rest of the report still works.
  */
 async function fetchItemCategoryMap() {
   try {
+    // Step 1: get category_id -> category_name map
+    const categoryIdNameMap = await fetchCategoryIdNameMap();
+
+    // Step 2: fetch all items with pagination
     const items = [];
     let cursor = null;
     let pages = 0;
@@ -105,12 +133,16 @@ async function fetchItemCategoryMap() {
       pages += 1;
     } while (cursor && pages < MAX_PAGES);
 
+    // Step 3: build item_id -> category_name map
     const map = new Map();
     for (const item of items) {
       const id = item.id || item.item_id;
       if (!id) continue;
-      // category_name is directly on item in Loyverse Items API
-      const categoryName = item.category_name || item.category || '';
+      // Loyverse Items API returns category_id, not category_name
+      const categoryId = item.category_id;
+      const categoryName = categoryId
+        ? (categoryIdNameMap.get(categoryId) || '')
+        : (item.category_name || item.category || '');
       map.set(id, String(categoryName).trim().toLowerCase());
     }
 
