@@ -133,14 +133,35 @@
           <span id="unclassifiedHint" class="text-muted small"></span>
         </div>
 
+        <!-- Order Entries Table -->
+        <h2 class="h5 mt-4 mb-3">Order Entries</h2>
+        <div class="table-responsive order-entries-table-wrap">
+          <table class="table table-sm align-middle mb-0" id="orderEntriesTable">
+            <thead>
+              <tr>
+                <th scope="col">Time</th>
+                <th scope="col">Receipt</th>
+                <th scope="col">Grams</th>
+                <th scope="col" class="text-end">Price (Main+Acc / F&B)</th>
+              </tr>
+            </thead>
+            <tbody id="orderEntriesBody">
+              <tr>
+                <td colspan="4" class="text-muted text-center py-3">-</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Detailed Sales Record -->
         <h2 class="h5 mt-4 mb-3">Detailed Sales Record</h2>
         <div class="table-responsive bestbuds-table-wrap">
           <table class="table table-sm align-middle mb-0" id="bestBudsSalesTable">
             <thead>
               <tr>
-                <th scope="col">G (Qty)</th>
-                <th scope="col">Item Name</th>
-                <th scope="col" class="text-end">Price (M / F&amp;B)</th>
+                <th scope="col">G (QTY)</th>
+                <th scope="col">ITEM NAME</th>
+                <th scope="col" class="text-end">PRICE (M / F&B)</th>
               </tr>
             </thead>
             <tbody id="bestBudsSalesBody">

@@ -22,6 +22,11 @@ const els = {
   transferTotal: document.getElementById('transferTotal'),
   transferEntriesList: document.getElementById('transferEntriesList'),
   transferEntriesTotal: document.getElementById('transferEntriesTotal'),
+  
+  // Order Entries Table
+  orderEntriesBody: document.getElementById('orderEntriesBody'),
+  
+  // Detailed Sales Record
   bestBudsSalesBody: document.getElementById('bestBudsSalesBody'),
 
   unclassifiedHint: document.getElementById('unclassifiedHint')
@@ -94,7 +99,9 @@ function formatTime(isoString) {
   try {
     const date = new Date(isoString);
     if (isNaN(date.getTime())) return '';
-    return date.getHours().toString().padStart(2, '0') + ':' + date.getMinutes().toString().padStart(2, '0');
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
   } catch (e) { return ''; }
 }
 
@@ -170,20 +177,23 @@ function applyPaymentDetails(data) {
   if (els.discountEntriesTotal) els.discountEntriesTotal.textContent = formatCurrency(discountTotal);
 }
 
-function processBestBudsOrders(data) {
+/**
+ * Process orders and build both Order Entries table rows and Detailed Sales Record items
+ */
+function processOrdersData(data) {
   const orders = Array.isArray(data?.orders) ? data.orders : [];
-  let totalDailyGrams = 0;
-  const tableRows = [];
-  
+  const orderEntries = [];
+  const detailedItems = [];
+  let totalGrams = 0;
+
   orders.forEach(order => {
-    let lineGram = 0;
+    let orderLineGram = 0;
     let mainAndAccPrice = 0;
     let fbPriceTotal = 0;
     let mainItemName = "";
 
     const items = order?.line_items || order?.items || [];
-    
-    const orderTotalMoney = Number(order?.total_money || 0); 
+    const orderTotalMoney = Number(order?.total_money || 0);
     const orderDiscountMoney = Number(order?.total_discount || 0);
     const hasOrderDiscount = orderDiscountMoney > 0;
 
@@ -191,18 +201,18 @@ function processBestBudsOrders(data) {
       let itemName = String(item?.name || item?.item_name || "").toLowerCase();
       let category = String(item?.category_name || "").toLowerCase();
       
-      let grossPrice = Number(item?.gross_total_money || item?.total_money || (Number(item?.price || 0) * Number(item?.quantity || item?.qty || 0))); 
+      let grossPrice = Number(item?.gross_total_money || item?.total_money || (Number(item?.price || 0) * Number(item?.quantity || item?.qty || 0)));
       
       let itemNetPrice = grossPrice;
       if (hasOrderDiscount && orderTotalMoney > 0) {
-          itemNetPrice = grossPrice - (grossPrice / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
+        itemNetPrice = grossPrice - (grossPrice / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
       }
 
       let qty = Number(item?.quantity || item?.qty || 0);
 
       // Lemon Cherry Override (7G Fix)
       if (itemName.includes('lemon cherry') && grossPrice >= 4970) {
-        qty = 7; 
+        qty = 7;
       }
 
       // Category Identification
@@ -212,76 +222,117 @@ function processBestBudsOrders(data) {
       let isFB = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk']
                  .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || (grossPrice / (qty || 1)) <= 50;
 
-      // Best Buds Routing Logic
+      // Routing Logic
       if (isFB) {
-        fbPriceTotal += itemNetPrice; 
+        fbPriceTotal += itemNetPrice;
       } else if (isAcc) {
-        mainAndAccPrice += itemNetPrice; 
+        mainAndAccPrice += itemNetPrice;
       } else {
-        mainAndAccPrice += itemNetPrice; 
+        mainAndAccPrice += itemNetPrice;
         
         // Gram Exclusion Logic
         const isFree = grossPrice === 0 || itemName.includes('free');
         const isLobbyShirt = itemName.includes('the lobby shirt');
         
         if (!isFree && !isLobbyShirt) {
-          lineGram += qty;
+          orderLineGram += qty;
           if (!mainItemName) mainItemName = item?.name;
         }
       }
+
+      // Add to detailed items list
+      detailedItems.push({
+        grams: !isFB && !isAcc && grossPrice > 0 && !itemName.includes('free') && !itemName.includes('the lobby shirt') ? qty : 0,
+        itemName: item?.name || 'Unknown Item',
+        mainPrice: isFB ? 0 : itemNetPrice,
+        fbPrice: isFB ? itemNetPrice : 0
+      });
     });
 
-    totalDailyGrams += lineGram;
-    
-    // Price Split Format
-    const splitFormat = `THB ${mainAndAccPrice.toFixed(2)} / ${fbPriceTotal.toFixed(2)}`;
-    
-    // Table Row
-    tableRows.push({
+    totalGrams += orderLineGram;
+
+    // Add to Order Entries
+    orderEntries.push({
       time: order?.created_at || "",
       receiptNumber: order?.receipt_number || "",
-      g: lineGram,
-      name: mainItemName || (mainAndAccPrice > 0 ? "Accessories" : "F&B/Misc"),
-      priceDisplay: `${mainAndAccPrice.toFixed(2)} / ${fbPriceTotal.toFixed(2)}`
+      grams: orderLineGram,
+      mainPrice: mainAndAccPrice,
+      fbPrice: fbPriceTotal
     });
   });
 
-  return { 
-    totalDailyGrams, 
-    tableRows
+  return {
+    orderEntries,
+    detailedItems,
+    totalGrams
   };
 }
 
-function renderBestBudsTable(data) {
-  if (!els.bestBudsSalesBody) return;
+/**
+ * Render Order Entries table
+ */
+function renderOrderEntriesTable(orderEntries) {
+  if (!els.orderEntriesBody) return;
 
-  const { totalDailyGrams, tableRows } = processBestBudsOrders(data || {});
-  const totalGrams = round2(totalDailyGrams);
+  els.orderEntriesBody.innerHTML = '';
 
-  // Update total grams display
-  if (els.totalGramsSold) {
-    els.totalGramsSold.textContent = formatGram(totalGrams);
+  if (!orderEntries.length) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="4" class="text-muted text-center py-3">-</td>`;
+    els.orderEntriesBody.appendChild(tr);
+    return;
   }
+
+  orderEntries.forEach((entry, idx) => {
+    const tr = document.createElement('tr');
+    const timeStr = entry.time ? formatTime(entry.time) : '-';
+    const gramClass = entry.grams > 0 ? 'text-success fw-bold' : 'text-muted';
+    const gramDisplay = entry.grams > 0 ? `${entry.grams.toFixed(2)} G` : '0.00 G';
+    const priceDisplay = `THB ${entry.mainPrice.toFixed(2)} / THB ${entry.fbPrice.toFixed(2)}`;
+    
+    tr.innerHTML = `
+      <td class="text-muted small">${timeStr}</td>
+      <td class="text-muted small">${entry.receiptNumber || (idx + 1)}</td>
+      <td class="${gramClass}">${gramDisplay}</td>
+      <td class="text-end small">${priceDisplay}</td>
+    `;
+    els.orderEntriesBody.appendChild(tr);
+  });
+}
+
+/**
+ * Render Detailed Sales Record table
+ */
+function renderDetailedSalesTable(detailedItems, totalGrams) {
+  if (!els.bestBudsSalesBody) return;
 
   els.bestBudsSalesBody.innerHTML = '';
 
-  if (!tableRows.length) {
+  if (!detailedItems.length) {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td colspan="3" class="text-muted text-center py-3">-</td>`;
     els.bestBudsSalesBody.appendChild(tr);
     return;
   }
 
-  tableRows.forEach((row, idx) => {
+  detailedItems.forEach(item => {
     const tr = document.createElement('tr');
-    const gramClass = row.g > 0 ? 'text-success fw-bold' : 'text-muted';
+    const gramClass = item.grams > 0 ? 'text-success fw-bold' : 'text-muted';
+    const gramDisplay = item.grams > 0 ? item.grams.toFixed(3) : '0.000';
+    const priceDisplay = `${item.mainPrice.toFixed(2)} / ${item.fbPrice.toFixed(2)}`;
+    
     tr.innerHTML = `
-      <td class="${gramClass}">${row.g > 0 ? row.g.toFixed(3) : '0.000'}</td>
-      <td>${row.name || 'Item'}</td>
-      <td class="text-end price-split">${row.priceDisplay}</td>
+      <td class="${gramClass}">${gramDisplay}</td>
+      <td>${item.itemName}</td>
+      <td class="text-end small">${priceDisplay}</td>
     `;
     els.bestBudsSalesBody.appendChild(tr);
   });
+
+  // Update total grams
+  if (els.totalGramsSold) {
+    els.totalGramsSold.textContent = formatGram(totalGrams);
+  }
 }
 
 function setButtonLoading(btn, text, isLoading) {
@@ -321,9 +372,16 @@ async function syncFromLoyverse() {
     if (!res.ok) throw new Error(data?.message || 'Sync failed');
     
     lastSyncedData = data;
-    applyPaymentDetails(data);
-    renderBestBudsTable(data);
     
+    // Apply payment details
+    applyPaymentDetails(data);
+    
+    // Process and render order data
+    const { orderEntries, detailedItems, totalGrams } = processOrdersData(data);
+    renderOrderEntriesTable(orderEntries);
+    renderDetailedSalesTable(detailedItems, totalGrams);
+    
+    // Update summary totals
     if (els.cashTotal) els.cashTotal.value = round2(data?.cash_total || 0).toFixed(2);
     if (els.cardTotal) els.cardTotal.value = round2(data?.card_total || 0).toFixed(2);
     if (els.transferTotal) els.transferTotal.value = round2(data?.transfer_total || 0).toFixed(2);
