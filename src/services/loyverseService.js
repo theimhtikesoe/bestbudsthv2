@@ -417,9 +417,17 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       // Group A: Main Flowers (ပန်းသီးသန့်)
       // Action -> ဘယ်ဘက်မှာထားမယ်, Gram ပေါင်းမယ်
       numeratorPrice += itemTotal;
-      totalGram += qty;
-      if (!mainItemName) {
-        mainItemName = String(lineItem.item_name || lineItem.name || "").trim();
+      
+      // --- [NEW] Gram Exclusion Logic ---
+      // Price 0, Name contains "free", or "The Lobby Shirt"
+      const isFree = itemTotal === 0 || itemName.includes('free');
+      const isLobbyShirt = itemName.includes('the lobby shirt');
+      
+      if (!isFree && !isLobbyShirt) {
+        totalGram += qty;
+        if (!mainItemName) {
+          mainItemName = String(lineItem.item_name || lineItem.name || "").trim();
+        }
       }
     }
 

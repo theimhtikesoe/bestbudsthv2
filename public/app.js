@@ -507,8 +507,16 @@ function processBestBudsOrders(data) {
         mainAndAccPrice += itemNetPrice; 
       } else {
         mainAndAccPrice += itemNetPrice; 
-        lineGram += qty; // Main Flower ဆိုမှ Gram ပေါင်းမယ်
-        if (!mainItemName) mainItemName = item.name;
+        
+        // --- [NEW] Gram Exclusion Logic ---
+        // Price 0, Discount 100%, Name contains "free", or "The Lobby Shirt"
+        const isFree = grossPrice === 0 || itemName.includes('free');
+        const isLobbyShirt = itemName.includes('the lobby shirt');
+        
+        if (!isFree && !isLobbyShirt) {
+          lineGram += qty; // Main Flower ဆိုမှ Gram ပေါင်းမယ်
+          if (!mainItemName) mainItemName = item.name;
+        }
       }
     });
 
