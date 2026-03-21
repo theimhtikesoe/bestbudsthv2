@@ -265,12 +265,13 @@ function processOrdersData(data) {
       let itemName = String(item?.name || item?.item_name || "").toLowerCase();
       let category = String(item?.category_name || "").toLowerCase();
       
-      let grossPrice = Number(item?.gross_total_money || item?.total_money || (Number(item?.price || 0) * Number(item?.quantity || item?.qty || 0)));
+      // --- Zero-Value Gatekeeper Rule ---
+      let grossPrice = Number(item?.gross_total_money ?? item?.total_money ?? (Number(item?.price ?? 0) * Number(item?.quantity ?? item?.qty ?? 0)));
       
       // Calculate item-level net price (after line-item discounts)
-      let lineItemNetPrice = Number(item?.total_money || item?.total_price || item?.line_total || grossPrice);
+      let lineItemNetPrice = Number(item?.total_money ?? item?.total_price ?? item?.line_total ?? grossPrice);
       if (item?.total_discount_money || item?.discount_money) {
-        lineItemNetPrice = grossPrice - Number(item?.total_discount_money || item?.discount_money || 0);
+        lineItemNetPrice = grossPrice - Number(item?.total_discount_money ?? item?.discount_money ?? 0);
       }
 
       // Further adjust for order-level discounts
@@ -279,7 +280,7 @@ function processOrdersData(data) {
         itemNetPrice = lineItemNetPrice - (lineItemNetPrice / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
       }
 
-      let qty = Number(item?.quantity || item?.qty || 0);
+      let qty = Number(item?.quantity ?? item?.qty ?? 0);
 
       // Lemon Cherry Override (7G Fix)
       if (itemName.includes('lemon cherry') && grossPrice >= 4970) {
@@ -296,7 +297,7 @@ function processOrdersData(data) {
                  (grossPrice / (qty || 1)) <= 50;
 
       // Gram Exclusion Logic
-      // 100% Discounted items (itemNetPrice <= 0) are excluded from grams
+      // 100% Discounted items (itemNetPrice === 0) are strictly excluded from grams
       const isFree = itemNetPrice <= 0 || itemName.includes('free');
       const isLobbyShirt = itemName.includes('the lobby shirt');
 

@@ -329,7 +329,8 @@ function extractLineItemQty(lineItem) {
 }
 
 function extractLineItemPrice(lineItem) {
-  // Prioritize net amount (after discounts)
+  // --- Zero-Value Gatekeeper Rule ---
+  // Prioritize net amount (after discounts) using nullish coalescing to catch 0
   const directAmount =
     lineItem?.total_money?.amount ??
     lineItem?.total_price_money?.amount ??
@@ -340,20 +341,17 @@ function extractLineItemPrice(lineItem) {
     lineItem?.amount ??
     null;
 
-  // If we have a direct net amount, use it. 
-  // We check for null/undefined specifically because 0 is a valid net amount (100% discount)
   if (directAmount !== null && directAmount !== undefined) {
     return normalizeMoney(directAmount);
   }
 
-  // Fallback to gross amount if net is not available
+  // Fallback to gross amount minus explicit discounts if net is not directly available
   const grossAmount = 
     lineItem?.gross_sales_money?.amount ??
     lineItem?.subtotal_money?.amount ??
     null;
 
   if (grossAmount !== null && grossAmount !== undefined) {
-    // If we have gross amount, we must also subtract discounts to get net
     const gross = normalizeMoney(grossAmount);
     const discount = normalizeMoney(
       lineItem?.total_discount_money?.amount ?? 
