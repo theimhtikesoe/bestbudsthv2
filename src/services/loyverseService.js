@@ -28,15 +28,15 @@ function getDateBounds(date) {
     throw new Error('Invalid date format. Use YYYY-MM-DD.');
   }
 
-  // --- THAILAND TIMEZONE SYNC FIX (00:00:00 to 00:00:25) ---
+  // --- THAILAND TIMEZONE SYNC FIX ---
   // Using dayjs with timezone for robust calculation
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
   
-  // Start Time (Midnight TH Time)
+  // Start Time: 00:00:00 of the selected date in local timezone
   const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
   
-  // End Time (Midnight + 25 seconds TH Time)
-  const endLocal = startLocal.clone().add(1, 'day').second(25);
+  // End Time: 23:59:59 of the selected date in local timezone
+  const endLocal = startLocal.clone().endOf('day');
 
   if (!startLocal.isValid()) {
     throw new Error('Invalid date format. Use YYYY-MM-DD.');
