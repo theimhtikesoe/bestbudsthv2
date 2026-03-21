@@ -32,11 +32,11 @@ function getDateBounds(date) {
   // Using dayjs with timezone for robust calculation
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
   
-  // Start Time: 00:00:00 of the selected date in local timezone
-  const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
+  // Start Time: 00:00:25 of the selected date in local timezone
+  const startLocal = dayjs.tz(`${date} 00:00:25`, tz);
   
   // End Time: 23:59:59 of the selected date in local timezone
-  const endLocal = startLocal.clone().endOf('day');
+  const endLocal = dayjs.tz(`${date} 23:59:59`, tz);
 
   if (!startLocal.isValid()) {
     throw new Error('Invalid date format. Use YYYY-MM-DD.');
