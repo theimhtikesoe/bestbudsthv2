@@ -626,15 +626,18 @@ async function exportToExcel() {
       let isFreeItem = (unitPrice === 0) || (itemNetPrice === 0) || itemName.includes('free');
       if (itemName.includes('lemon cherry') && grossPrice >= 4970) { qty = 7; }
 
-      const isRozayCake = itemName.includes('rozay cake');
-
-      let isAcc = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'tray']
+      // --- ROBUST CATEGORIZATION ---
+      let isAcc = ['accessories', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'tray']
                   .some(keyword => itemName.includes(keyword) || category.includes(keyword));
       
-      let isFB = !isRozayCake && (['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake']
-                 .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || 
-                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')) ||
-                 (grossPrice / (qty || 1)) <= 50);
+      let isFBKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk']
+                         .some(keyword => itemName.includes(keyword) || category.includes(keyword));
+      
+      // Prevent Free items and Pina Colada from becoming F&B just because price is <= 50
+      let isCheapFB = (qty > 0 && (grossPrice / qty) <= 50 && !isFreeItem && !itemName.includes('pina colada'));
+      
+      let isFB = isFBKeywords || isCheapFB;
+      // ------------------------------
 
       if (isFB) {
          orderFBItems.push({ name: rawItemName, discountDisplay, qty, unitPrice, itemNetPrice, discountNote });
