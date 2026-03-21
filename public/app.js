@@ -288,6 +288,10 @@ function processOrdersData(data) {
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')) ||
                  (grossPrice / (qty || 1)) <= 50;
 
+      // Gram Exclusion Logic
+      const isFree = grossPrice <= 0 || itemName.includes('free');
+      const isLobbyShirt = itemName.includes('the lobby shirt');
+
       // Routing Logic
       if (isFB) {
         fbPriceTotal += itemNetPrice;
@@ -295,10 +299,6 @@ function processOrdersData(data) {
         mainAndAccPrice += itemNetPrice;
       } else {
         mainAndAccPrice += itemNetPrice;
-        
-        // Gram Exclusion Logic
-        const isFree = grossPrice <= 0 || itemName.includes('free');
-        const isLobbyShirt = itemName.includes('the lobby shirt');
         
         if (!isFree && !isLobbyShirt) {
           orderLineGram += qty;
