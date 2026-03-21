@@ -287,7 +287,7 @@ function processOrdersData(data) {
       let isAcc = ['accessories', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter']
                   .some(keyword => itemName.includes(keyword) || category.includes(keyword));
       
-      let isFB = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk']
+      let isFB = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail']
                  .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || (grossPrice / (qty || 1)) <= 50;
 
       // Routing Logic
