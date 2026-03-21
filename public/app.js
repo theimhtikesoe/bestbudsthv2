@@ -428,6 +428,50 @@ function clearMessage() {
   }
 }
 
+/**
+ * Fallback: Convert automated_report_rows (from backend) into the same format
+ * that processOrdersData produces, so the same render functions can be used.
+ * Each row represents one receipt/order.
+ */
+function processAutomatedReportRows(data) {
+  const rows = data.automated_report_rows || [];
+  const totals = data.automated_report_totals || {};
+  const orderEntries = [];
+  const detailedItems = [];
+  let totalGrams = 0;
+
+  rows.forEach(row => {
+    const gramQty = parseNumber(row.gram_qty);
+    const numeratorPrice = parseNumber(row.numerator_price);
+    const denominatorPrice = parseNumber(row.denominator_price);
+    totalGrams += gramQty;
+
+    // Order Entries (one per receipt)
+    orderEntries.push({
+      time: row.time || '',
+      receiptNumber: row.receipt_number || '',
+      grams: gramQty,
+      mainPrice: numeratorPrice,
+      fbPrice: denominatorPrice
+    });
+
+    // Detailed Sales Record (one per receipt in this fallback mode)
+    detailedItems.push({
+      grams: gramQty,
+      itemName: row.item_name || 'Unknown Item',
+      mainPrice: numeratorPrice,
+      fbPrice: denominatorPrice
+    });
+  });
+
+  // Use backend totals if available for accuracy
+  if (totals.total_gram_qty !== undefined) {
+    totalGrams = parseNumber(totals.total_gram_qty);
+  }
+
+  return { orderEntries, detailedItems, totalGrams };
+}
+
 async function syncFromLoyverse() {
   clearMessage();
   if (!els.reportDate?.value) return;
@@ -448,9 +492,20 @@ async function syncFromLoyverse() {
     applyPaymentDetails(data);
     
     // Process and render order data
-    const { orderEntries, detailedItems, totalGrams } = processOrdersData(data);
-    renderOrderEntriesTable(orderEntries);
-    renderDetailedSalesTable(detailedItems, totalGrams);
+    // Use raw orders if available, otherwise fallback to automated_report_rows
+    if (Array.isArray(data?.orders) && data.orders.length > 0) {
+      const { orderEntries, detailedItems, totalGrams } = processOrdersData(data);
+      renderOrderEntriesTable(orderEntries);
+      renderDetailedSalesTable(detailedItems, totalGrams);
+    } else if (Array.isArray(data?.automated_report_rows) && data.automated_report_rows.length > 0) {
+      // Fallback: use pre-processed automated_report_rows from backend
+      const fallbackResult = processAutomatedReportRows(data);
+      renderOrderEntriesTable(fallbackResult.orderEntries);
+      renderDetailedSalesTable(fallbackResult.detailedItems, fallbackResult.totalGrams);
+    } else {
+      renderOrderEntriesTable([]);
+      renderDetailedSalesTable([], 0);
+    }
     
     // Update summary totals
     if (els.cashTotal) els.cashTotal.value = round2(data?.cash_total || 0).toFixed(2);
