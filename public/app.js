@@ -311,14 +311,14 @@ function processOrdersData(data) {
         
         if (!isFree && !isLobbyShirt) {
           orderLineGram += qty;
-          if (!mainItemName) mainItemName = item?.name;
+          if (!mainItemName) mainItemName = item?.item_name || item?.name;
         }
       }
 
       // Add to detailed items list
       detailedItems.push({
         grams: !isFB && !isAcc && !isFree && !isLobbyShirt ? qty : 0,
-        itemName: item?.name || 'Unknown Item',
+        itemName: item?.item_name || item?.name || 'Unknown Item',
         mainPrice: isFB ? 0 : itemNetPrice,
         fbPrice: isFB ? itemNetPrice : 0
       });
