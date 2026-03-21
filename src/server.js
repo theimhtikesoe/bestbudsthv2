@@ -65,8 +65,13 @@ async function initializeDatabaseOnStartup() {
       await initializeSchema();
     }
 
-    await testConnection();
-    console.log('[DB] Startup connection check passed');
+    // Skip test connection on Vercel if database is not required
+    if (!isVercelRuntime || shouldRequireDbOnStartup()) {
+      await testConnection();
+      console.log('[DB] Startup connection check passed');
+    } else {
+      console.log('[DB] Skipping database check on Vercel (optional)');
+    }
   } catch (error) {
     if (shouldRequireDbOnStartup()) {
       throw error;
