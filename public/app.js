@@ -32,6 +32,58 @@ const els = {
   unclassifiedHint: document.getElementById('unclassifiedHint')
 };
 
+// --- EXPENSES LOGIC ---
+let dailyExpenses = [];
+let currentNetSale = 0; // Backend ကလာတဲ့ Net Sale ကို သိမ်းထားဖို့
+
+function addExpense() {
+  const nameInput = document.getElementById('expenseName');
+  const amountInput = document.getElementById('expenseAmount');
+  const name = nameInput?.value.trim();
+  const amount = Number(amountInput?.value);
+
+  if (name && amount > 0) {
+    dailyExpenses.push({ id: Date.now(), name, amount });
+    nameInput.value = '';
+    amountInput.value = '';
+    renderExpenses();
+  }
+}
+
+function removeExpense(id) {
+  dailyExpenses = dailyExpenses.filter(exp => exp.id !== id);
+  renderExpenses();
+}
+
+function renderExpenses() {
+  const list = document.getElementById('expenseList');
+  const totalDisplay = document.getElementById('totalExpensesDisplay');
+  const netCashDisplay = document.getElementById('netCashDisplay');
+  if (!list || !totalDisplay || !netCashDisplay) return;
+  
+  list.innerHTML = '';
+  let totalExp = 0;
+
+  dailyExpenses.forEach(exp => {
+    totalExp += exp.amount;
+    const li = document.createElement('li');
+    li.className = "d-flex justify-content-between align-items-center mb-2 text-light";
+    li.innerHTML = `
+      <span>${exp.name}</span>
+      <span>
+        <span class="text-danger me-3">THB ${exp.amount.toFixed(2)}</span>
+        <button onclick="removeExpense(${exp.id})" class="btn btn-sm btn-outline-danger py-0 px-2">X</button>
+      </span>
+    `;
+    list.appendChild(li);
+  });
+
+  totalDisplay.innerText = totalExp.toFixed(2);
+  const netCash = currentNetSale - totalExp;
+  netCashDisplay.innerText = netCash.toFixed(2);
+}
+// ----------------------
+
 function todayLocalDate() {
   const now = new Date();
   const tzOffset = now.getTimezoneOffset() * 60000;
@@ -109,15 +161,26 @@ function normalizeEntries(entries) {
   if (!Array.isArray(entries)) return [];
   return entries.map(entry => {
     let amount = 0, percentage = null, time = null, receiptNumber = null;
+    let mainAccTotal = 0, fbTotal = 0;
+    
     if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
       amount = entry.amount ?? entry.money_amount?.amount ?? entry.amount_money?.amount ?? entry.total_money?.amount ?? 0;
       percentage = parsePercentage(entry.percentage ?? entry.percent ?? entry.rate);
       time = entry.time || null;
       receiptNumber = entry.receiptNumber || entry.receipt_number || entry.number || null;
+      
+      mainAccTotal = entry.main_acc_total || 0;
+      fbTotal = entry.fb_total || 0;
     } else {
       amount = entry;
+      mainAccTotal = amount;
     }
-    return { amount: round2(parseNumber(amount)), percentage, time, receiptNumber };
+    return { 
+        amount: round2(parseNumber(amount)), 
+        percentage, time, receiptNumber, 
+        mainAccTotal: round2(parseNumber(mainAccTotal)), 
+        fbTotal: round2(parseNumber(fbTotal)) 
+    };
   }).filter(e => e.amount > 0);
 }
 
@@ -147,7 +210,11 @@ function renderEntryList(listElement, entries, options = {}) {
         content = percentageOnly ? `${percentageFallbackText}` : `${formatCurrency(entry.amount)}`;
       }
     } else {
-      content = `${formatCurrency(entry.amount)}`;
+      if ((entry.mainAccTotal > 0 || entry.fbTotal > 0) && round2(entry.mainAccTotal + entry.fbTotal) === round2(entry.amount)) {
+         content = `THB ${entry.mainAccTotal.toFixed(2)} / ${entry.fbTotal.toFixed(2)}`;
+      } else {
+         content = `${formatCurrency(entry.amount)}`;
+      }
     }
     
     li.textContent = content;
@@ -373,6 +440,9 @@ async function syncFromLoyverse() {
     
     lastSyncedData = data;
     
+    // Set Net Sale for Expense calculation
+    currentNetSale = round2(data?.net_sale || 0);
+    
     // Apply payment details
     applyPaymentDetails(data);
     
@@ -385,8 +455,11 @@ async function syncFromLoyverse() {
     if (els.cashTotal) els.cashTotal.value = round2(data?.cash_total || 0).toFixed(2);
     if (els.cardTotal) els.cardTotal.value = round2(data?.card_total || 0).toFixed(2);
     if (els.transferTotal) els.transferTotal.value = round2(data?.transfer_total || 0).toFixed(2);
-    if (els.netSale) els.netSale.value = round2(data?.net_sale || 0).toFixed(2);
+    if (els.netSale) els.netSale.value = currentNetSale.toFixed(2);
     if (els.totalOrders) els.totalOrders.value = data?.total_orders || 0;
+    
+    // Refresh Expense display
+    renderExpenses();
     
   } catch (e) { 
     console.error('Sync Error:', e);

@@ -89,6 +89,25 @@
           </div>
         </div>
 
+        <div class="expenses-section card shadow-sm mb-4 mt-2" style="background-color: #1a1a1a; border: 1px solid #333;">
+          <div class="card-body">
+            <h3 class="h6 text-warning mb-3">💸 Daily Expenses & Net Cash</h3>
+            <div class="d-flex flex-wrap gap-2 mb-3">
+              <input type="text" id="expenseName" class="form-control bg-dark text-light border-secondary" placeholder="e.g., Taxi, Ice, Deli" style="flex: 1; min-width: 150px;">
+              <input type="number" id="expenseAmount" class="form-control bg-dark text-light border-secondary" placeholder="Amount (THB)" style="width: 150px;">
+              <button onclick="addExpense()" class="btn btn-warning fw-bold">Add Expense</button>
+            </div>
+            
+            <ul id="expenseList" class="list-unstyled mb-3 pb-3 border-bottom border-secondary">
+              </ul>
+
+            <div class="d-flex justify-content-between fw-bold fs-6">
+              <div class="text-light">Total Expenses: <span class="text-danger">THB <span id="totalExpensesDisplay">0.00</span></span></div>
+              <div class="text-light">Net Cash (Net Sale - Exp): <span class="text-success">THB <span id="netCashDisplay">0.00</span></span></div>
+            </div>
+          </div>
+        </div>
+
         <h2 class="h5 mt-4 mb-3">Order Payment Details</h2>
         <div class="row g-3">
           <div class="col-md-3">
