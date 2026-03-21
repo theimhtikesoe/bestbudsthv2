@@ -560,7 +560,7 @@ if (document.readyState === 'loading') {
   init();
 }
 
-// --- 📥 EXCEL EXPORT ENGINE (BEST BUDS TEMPLATE) ---
+// --- 📥 EXCEL EXPORT ENGINE (BEST BUDS 3-SECTION TEMPLATE) ---
 function exportToExcel() {
   if (!lastSyncedData || !lastSyncedData.orders) {
     alert("Please Sync From Loyverse first before exporting!");
@@ -569,14 +569,10 @@ function exportToExcel() {
 
   const orders = lastSyncedData.orders;
   
-  // 1. Excel Column Headers
-  const headers = ["Item Type", "Item Name", "Discount", "Qty/Grams", "Unit Price", "Total Price", "Payment Method", "Total Grams", "Note"];
-  let csvRows = [headers.join(",")];
-
+  let mainRows = [];
+  let fbRows = [];
   let totalDailyGrams = 0;
-  let totalExpenses = dailyExpenses.reduce((sum, exp) => sum + exp.amount, 0);
 
-  // 2. Process each order and extract line items
   orders.forEach(order => {
     const items = order.line_items || order.items || [];
     
@@ -597,6 +593,10 @@ function exportToExcel() {
     if (hasOrderDiscount && (orderTotalMoney + orderDiscountMoney) > 0) {
        orderDiscountPercent = (orderDiscountMoney / (orderTotalMoney + orderDiscountMoney));
     }
+
+    let orderMainItems = [];
+    let orderFBItems = [];
+    let orderGrams = 0;
 
     items.forEach(item => {
       let rawItemName = item.item_name || item.name || "Unknown";
@@ -619,13 +619,8 @@ function exportToExcel() {
         itemNetPrice = lineItemNetPrice - (lineItemNetPrice * orderDiscountPercent);
       }
 
-      // Format Discount to string (e.g., "0.2" for 20%)
-      let itemDiscountPercent = 0;
-      if (grossPrice > 0) {
-        itemDiscountPercent = (grossPrice - itemNetPrice) / grossPrice;
-      }
-      let discountDisplay = itemDiscountPercent > 0 ? itemDiscountPercent.toFixed(2) : "";
-      let discountNote = itemDiscountPercent > 0 ? `${(itemDiscountPercent * 100).toFixed(0)}% dis` : "";
+      let discountDisplay = orderDiscountPercent > 0 ? orderDiscountPercent.toFixed(2) : "";
+      let discountNote = orderDiscountPercent > 0 ? `${(orderDiscountPercent * 100).toFixed(0)}% dis- ${Math.round(grossPrice * orderDiscountPercent)}` : "";
 
       // Gatekeeper Check (Strict 0 check)
       let isFreeItem = (itemNetPrice <= 0) || itemName.includes('free');
@@ -645,55 +640,82 @@ function exportToExcel() {
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')) ||
                  (grossPrice / (qty || 1)) <= 50);
 
-      // Determine Item Type & Grams
-      let itemType = "";
-      let lineGramDisplay = "";
-
       if (isFB) {
-        itemType = "Foods & Drinks";
-      } else if (isAcc) {
-        itemType = "Accessories";
+         orderFBItems.push({ name: rawItemName, discountDisplay, qty, unitPrice, itemNetPrice, discountNote });
       } else {
-        itemType = "Flower";
-        if (!isFreeItem) { 
-            lineGramDisplay = `${qty} g`;
-            totalDailyGrams += qty;
-        }
+         let itemType = isAcc ? "Accessories" : "Flower";
+         let gramVal = (!isFreeItem && !isAcc) ? qty : 0;
+         orderMainItems.push({ type: itemType, name: rawItemName, discountDisplay, qty, unitPrice, itemNetPrice, discountNote, gramVal });
+         if (!isFreeItem) orderGrams += gramVal;
       }
-
-      // Escape commas in names
-      let safeItemName = `"${rawItemName.replace(/"/g, '""')}"`;
-      let safeNote = `"${discountNote}"`;
-
-      // Build the row
-      let rowData = [
-        itemType, 
-        safeItemName, 
-        discountDisplay, 
-        qty, 
-        unitPrice.toFixed(2), 
-        itemNetPrice.toFixed(2), 
-        paymentMethod, 
-        lineGramDisplay, 
-        safeNote
-      ];
-      csvRows.push(rowData.join(","));
     });
+
+    // 🌟 တွဲပေးမည့်အပိုင်း (Main Items) 🌟
+    if (orderMainItems.length > 0) {
+        let types = [...new Set(orderMainItems.map(i => i.type))].join("/ ");
+        let names = orderMainItems.map(i => i.name).join("/ ");
+        let qtys = orderMainItems.map(i => i.qty).join("/ ");
+        let unitPrices = orderMainItems.map(i => i.unitPrice.toFixed(2)).join("/ ");
+        let totalPrice = orderMainItems.reduce((sum, i) => sum + i.itemNetPrice, 0);
+        let discounts = [...new Set(orderMainItems.map(i => i.discountDisplay))].filter(Boolean).join("/ ");
+        let notes = [...new Set(orderMainItems.map(i => i.discountNote))].filter(Boolean).join(", ");
+        let gramDisplay = orderGrams > 0 ? `${orderGrams}g` : "";
+
+        mainRows.push([
+            types, 
+            `"${names.replace(/"/g, '""')}"`, 
+            discounts, 
+            `"${qtys}"`, 
+            `"${unitPrices}"`, 
+            totalPrice.toFixed(2), 
+            paymentMethod, 
+            gramDisplay, 
+            `"${notes}"`
+        ].join(","));
+        totalDailyGrams += orderGrams;
+    }
+
+    // 🌟 F&B သီးသန့် 🌟
+    if (orderFBItems.length > 0) {
+        let names = orderFBItems.map(i => i.name).join("/ ");
+        let qtys = orderFBItems.map(i => i.qty).join("/ ");
+        let unitPrices = orderFBItems.map(i => i.unitPrice.toFixed(2)).join("/ ");
+        let totalPrice = orderFBItems.reduce((sum, i) => sum + i.itemNetPrice, 0);
+        let discounts = [...new Set(orderFBItems.map(i => i.discountDisplay))].filter(Boolean).join("/ ");
+        let notes = [...new Set(orderFBItems.map(i => i.discountNote))].filter(Boolean).join(", ");
+
+        fbRows.push([
+            `"${names.replace(/"/g, '""')}"`, discounts, `"${qtys}"`, `"${unitPrices}"`, totalPrice.toFixed(2), paymentMethod, "", `"${notes}"`, ""
+        ].join(","));
+    }
   });
 
-  // 3. Append Expenses Section
-  csvRows.push(",,,,,,,,"); // Empty line
-  csvRows.push("Expenses ,,,,,,,,");
-  csvRows.push("Expense Category,Description,Amount,,,,,,");
+  // 🌟 CSV တည်ဆောက်ခြင်း 🌟
+  let csvLines = [];
   
+  csvLines.push("Item Type,Item Name,Discount,Qty/Grams,Unit Price,Total Price,Payment Method,Total Grams,Note");
+  csvLines.push(...mainRows);
+  
+  csvLines.push(",,,,,,,,");
+  csvLines.push(",,,,,,,,");
+  csvLines.push("Expenses,,,,,,,,");
+  csvLines.push("Expense Category,Description,Amount,,,,,,");
+  let totalExpenses = 0;
   dailyExpenses.forEach(exp => {
     let safeDesc = `"${exp.name.replace(/"/g, '""')}"`;
-    csvRows.push(`Inventory,${safeDesc},${exp.amount},,,,,,`);
+    let category = exp.name.toLowerCase().includes('taxi') ? "For Night Shift Staffs" : "Inventory"; 
+    csvLines.push(`${category},${safeDesc},${exp.amount},,,,,,`);
+    totalExpenses += exp.amount;
   });
-  csvRows.push(`,Total Expenses,${totalExpenses},,,,,,`);
-  
-  // 4. Create and Download the CSV File
-  let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvRows.map(e => e).join("\r\n");
+  csvLines.push(`,Total Expenses,${totalExpenses},,,,,,`);
+
+  csvLines.push(",,,,,,,,");
+  csvLines.push(",,,,,,,,");
+  csvLines.push("Foods & Drinks,,,,,,,,");
+  csvLines.push("Item Name,Discount,Qty,Unit Price,Total Price,Payment Method,,Note,");
+  csvLines.push(...fbRows);
+
+  let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + csvLines.join("\r\n");
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
