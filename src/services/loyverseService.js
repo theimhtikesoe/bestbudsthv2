@@ -418,30 +418,30 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
                 itemName.includes('lighter') ||
                 itemName.includes('the lobby') ||
                 itemName.includes('merch');
-    let isFB = normalizedCategory.includes('soft drink') || 
-               normalizedCategory.includes('snacks') || 
-               normalizedCategory.includes('beverage') ||
-               normalizedCategory.includes('drink') ||
-               normalizedCategory.includes('food') ||
-               normalizedCategory.includes('bakery') ||
-               itemName.includes('gummy') || 
-               itemName.includes('water') || 
-               itemName.includes('soda') ||
-               itemName.includes('beer') ||
-               itemName.includes('drink') ||
-               itemName.includes('beverage') ||
-               itemName.includes('alcohol') ||
-               itemName.includes('wine') ||
-               itemName.includes('cider') ||
-               itemName.includes('spirit') ||
-               itemName.includes('cocktail') ||
-               itemName.includes('milk') ||
-               itemName.includes('coffee') ||
-               (itemName.includes('tea') && !itemName.includes('tea time')) ||
-               itemName.includes('juice') ||
-               itemName.includes('cookie') ||
-               itemName.includes('brownie') ||
-               itemName.includes('cake');
+    let isFB = (normalizedCategory.includes('soft drink') || 
+                normalizedCategory.includes('snacks') || 
+                normalizedCategory.includes('beverage') ||
+                normalizedCategory.includes('drink') ||
+                normalizedCategory.includes('food') ||
+                normalizedCategory.includes('bakery') ||
+                itemName.includes('gummy') || 
+                itemName.includes('water') || 
+                itemName.includes('soda') ||
+                itemName.includes('beer') ||
+                itemName.includes('drink') ||
+                itemName.includes('beverage') ||
+                itemName.includes('alcohol') ||
+                itemName.includes('wine') ||
+                itemName.includes('cider') ||
+                itemName.includes('spirit') ||
+                itemName.includes('cocktail') ||
+                itemName.includes('milk') ||
+                itemName.includes('coffee') ||
+                (itemName.includes('tea') && !itemName.includes('tea time')) ||
+                itemName.includes('juice') ||
+                itemName.includes('cookie') ||
+                itemName.includes('brownie') ||
+                itemName.includes('cake')) && !itemName.includes('rozay cake');
 
     // --- [3] THE BEST BUDS ROUTING LOGIC ---
     // Note: In backend, we need to determine unit price for the <= 50 check

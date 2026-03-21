@@ -291,10 +291,10 @@ function processOrdersData(data) {
       let isAcc = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch']
                   .some(keyword => itemName.includes(keyword) || category.includes(keyword));
       
-      let isFB = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake']
+      let isFB = (['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake']
                  .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || 
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')) ||
-                 (grossPrice / (qty || 1)) <= 50;
+                 (grossPrice / (qty || 1)) <= 50) && !itemName.includes('rozay cake');
 
       // Gram Exclusion Logic
       // 100% Discounted items (itemNetPrice === 0) are strictly excluded from grams
