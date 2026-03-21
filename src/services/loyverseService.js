@@ -27,25 +27,17 @@ function getDateBounds(date) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '')) {
     throw new Error('Invalid date format. Use YYYY-MM-DD.');
   }
-
-  // --- THAILAND TIMEZONE SYNC FIX ---
-  // Using dayjs with timezone for robust calculation
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
-  
-  // Start Time: 00:00:25 of the selected date in local timezone
-  const startLocal = dayjs.tz(`${date} 00:00:25`, tz);
-  
-  // End Time: 23:59:59 of the selected date in local timezone
-  const endLocal = dayjs.tz(`${date} 23:59:59`, tz);
 
-  if (!startLocal.isValid()) {
-    throw new Error('Invalid date format. Use YYYY-MM-DD.');
-  }
+  // 🛡️ ZERO-GAP FIX:
+  // Start exactly at 00:00:00.000 and end at 23:59:59.999
+  // This ensures not a single millisecond is lost between days.
+  const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
+  const endLocal = dayjs.tz(`${date} 23:59:59`, tz).millisecond(999);
 
-  // Loyverse API expects UTC timestamps in ISO 8601 format
   return {
-    startIso: startLocal.utc().format('YYYY-MM-DDTHH:mm:ss[Z]'),
-    endIso: endLocal.utc().format('YYYY-MM-DDTHH:mm:ss[Z]')
+    startIso: startLocal.utc().format('YYYY-MM-DDTHH:mm:ss.SSS[Z]'),
+    endIso: endLocal.utc().format('YYYY-MM-DDTHH:mm:ss.SSS[Z]')
   };
 }
 
