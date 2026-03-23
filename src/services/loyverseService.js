@@ -29,12 +29,12 @@ function getDateBounds(date) {
   }
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
 
-  // 🛡️ HIGH-PRECISION MIDNIGHT SHIFT FIX:
-  // Start exactly at 00:00:00.999 of the selected date
-  // End exactly at 00:00:00.998 of the following day
-  // This ensures exactly 00:00:00.000 belongs to the PREVIOUS day.
-  const startLocal = dayjs.tz(`${date} 00:00:00`, tz).millisecond(999);
-  const endLocal = dayjs.tz(`${date} 00:00:00`, tz).add(1, 'day').millisecond(998);
+  // 🛡️ 1-MINUTE SHIFT FIX:
+  // Start exactly at 00:01:00.000 of the selected date
+  // End exactly at 00:00:59.999 of the following day
+  // This ensures midnight (00:00:00) belongs to the PREVIOUS day's report.
+  const startLocal = dayjs.tz(`${date} 00:01:00`, tz);
+  const endLocal = dayjs.tz(`${date} 00:01:00`, tz).add(1, 'day').subtract(1, 'millisecond');
 
   return {
     startIso: startLocal.utc().format('YYYY-MM-DDTHH:mm:ss.SSS[Z]'),
