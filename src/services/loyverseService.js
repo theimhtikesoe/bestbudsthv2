@@ -29,11 +29,12 @@ function getDateBounds(date) {
   }
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
 
-  // 🛡️ CUSTOM TIME RANGE FIX:
-  // Start exactly at 00:00:00.999 of the selected date
-  // End exactly at 00:00:00.998 of the following day
-  const startLocal = dayjs.tz(`${date} 00:00:00`, tz).millisecond(999);
-  const endLocal = dayjs.tz(`${date} 00:00:00`, tz).add(1, 'day').millisecond(998);
+  // 🛡️ MIDNIGHT SHIFT FIX:
+  // To ensure that exactly 00:00:00 belongs to the PREVIOUS day's report:
+  // Start the current day's report at 00:00:01
+  // End the current day's report at 00:00:00 of the following day
+  const startLocal = dayjs.tz(`${date} 00:00:01`, tz);
+  const endLocal = dayjs.tz(`${date} 00:00:00`, tz).add(1, 'day');
 
   return {
     startIso: startLocal.utc().format('YYYY-MM-DDTHH:mm:ss.SSS[Z]'),
