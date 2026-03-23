@@ -29,11 +29,11 @@ function getDateBounds(date) {
   }
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
 
-  // 🛡️ ZERO-GAP FIX:
-  // Start exactly at 00:00:00.000 and end at 23:59:59.999
-  // This ensures not a single millisecond is lost between days.
-  const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
-  const endLocal = dayjs.tz(`${date} 23:59:59`, tz).millisecond(999);
+  // 🛡️ CUSTOM TIME RANGE FIX:
+  // Start exactly at 00:00:00.999 of the selected date
+  // End exactly at 00:00:00.000 of the following day
+  const startLocal = dayjs.tz(`${date} 00:00:00`, tz).millisecond(999);
+  const endLocal = dayjs.tz(`${date} 00:00:00`, tz).add(1, 'day');
 
   return {
     startIso: startLocal.utc().format('YYYY-MM-DDTHH:mm:ss.SSS[Z]'),
