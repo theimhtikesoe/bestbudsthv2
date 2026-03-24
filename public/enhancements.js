@@ -267,14 +267,22 @@ async function exportReportToExcel() {
           const discountPercent = grossPrice > 0 ? (totalItemDiscount / grossPrice * 100) : 0;
           const discountStr = totalItemDiscount > 0 ? `${discountPercent.toFixed(0)}% (${totalItemDiscount.toFixed(2)} THB)` : '-';
 
-          // --- Classification (Same logic as app.js) ---
+          // --- Classification (Refined for Free Items) ---
           let isAcc = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch']
                       .some(keyword => itemName.includes(keyword) || category.includes(keyword));
+          
           let isGrapeSoda = itemName.includes('grape soda');
-          let isFB = !isGrapeSoda && (['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake']
-                     .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || 
-                     (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')) ||
-                     (grossPrice / (qty || 1)) <= 50) && !itemName.includes('rozay cake');
+          
+          // Identify F&B based on keywords
+          let fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake'];
+          let hasFBKeyword = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+                             (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
+
+          // Logic for F&B classification:
+          // 1. Must have F&B keyword OR (price <= 50 AND not a flower item)
+          // 2. Grape Soda and Rozay Cake are always Flower/Main
+          let isFB = !isGrapeSoda && !itemName.includes('rozay cake') && 
+                     (hasFBKeyword || ((grossPrice / (qty || 1)) <= 50 && !isAcc && !itemName.includes('free')));
 
           const exportItem = {
             name: item.name || item.item_name,
