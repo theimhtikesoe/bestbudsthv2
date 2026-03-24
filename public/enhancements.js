@@ -15,7 +15,24 @@ const EXPENSE_CATEGORIES = [
 ];
 
 /**
- * Add expense to the daily report
+ * Get expenses from LocalStorage
+ */
+function getLocalExpenses(date) {
+  const allExpenses = JSON.parse(localStorage.getItem('daily_expenses') || '{}');
+  return allExpenses[date] || [];
+}
+
+/**
+ * Save expenses to LocalStorage
+ */
+function saveLocalExpenses(date, expenses) {
+  const allExpenses = JSON.parse(localStorage.getItem('daily_expenses') || '{}');
+  allExpenses[date] = expenses;
+  localStorage.setItem('daily_expenses', JSON.stringify(allExpenses));
+}
+
+/**
+ * Add expense to the daily report (LocalStorage Version)
  */
 async function addExpenseToReport() {
   const dateInput = document.getElementById('reportDate');
@@ -34,21 +51,23 @@ async function addExpenseToReport() {
   }
 
   try {
-    const response = await fetch('/api/expenses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date, category, description, amount })
-    });
+    const expenses = getLocalExpenses(date);
+    const newExpense = {
+      id: Date.now(),
+      date,
+      category,
+      description,
+      amount,
+      created_at: new Date().toISOString()
+    };
+    
+    expenses.push(newExpense);
+    saveLocalExpenses(date, expenses);
 
-    if (!response.ok) {
-      const errData = await response.json().catch(() => ({}));
-      throw new Error(errData.message || 'Failed to add expense');
-    }
-
-    showMessage('Expense added successfully', 'success');
+    showMessage('Expense added successfully (Local)', 'success');
     descriptionInput.value = '';
     amountInput.value = '';
-    await loadExpenses(date);
+    renderExpensesList(expenses, date);
   } catch (error) {
     showMessage(`Error: ${error.message}`, 'danger');
   }
@@ -58,15 +77,8 @@ async function addExpenseToReport() {
  * Load expenses for a specific date
  */
 async function loadExpenses(date) {
-  try {
-    const response = await fetch(`/api/expenses/${date}`);
-    if (!response.ok) throw new Error('Failed to load expenses');
-
-    const data = await response.json();
-    renderExpensesList(data.expenses, date);
-  } catch (error) {
-    console.error('Error loading expenses:', error);
-  }
+  const expenses = getLocalExpenses(date);
+  renderExpensesList(expenses, date);
 }
 
 /**
@@ -111,22 +123,21 @@ function renderExpensesList(expenses, date) {
 }
 
 /**
- * Delete expense
+ * Delete expense (LocalStorage Version)
  */
 async function deleteExpense(id, date) {
   if (!confirm('Are you sure you want to delete this expense?')) return;
 
   try {
-    const response = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-    if (!response.ok) throw new Error('Failed to delete expense');
+    let expenses = getLocalExpenses(date);
+    expenses = expenses.filter(e => e.id !== id);
+    saveLocalExpenses(date, expenses);
 
     showMessage('Expense deleted', 'success');
-    await loadExpenses(date);
+    renderExpensesList(expenses, date);
   } catch (error) {
     showMessage(`Error: ${error.message}`, 'danger');
   }
-}
-
 /**
  * Export report to Excel with classification
  */
@@ -135,12 +146,15 @@ async function exportReportToExcel() {
   const date = dateInput?.value;
 
   if (!date) {
-    showMessage('Please select a date', 'warning');
+    showMessage('Please select a date first', 'warning');
     return;
   }
 
   try {
-    const response = await fetch(`/api/reports/${date}/export`);
+    const expenses = getLocalExpenses(date);
+    const expensesParam = encodeURIComponent(JSON.stringify(expenses));
+    
+    const response = await fetch(`/api/reports/${date}/export?expenses=${expensesParam}`);
     if (!response.ok) {
       const errData = await response.json().catch(() => ({}));
       throw new Error(errData.message || 'Failed to export report');
@@ -150,13 +164,11 @@ async function exportReportToExcel() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Daily-Report-${date}.xlsx`;
+    a.download = `BestBuds_Report_${date}.xlsx`;
     document.body.appendChild(a);
     a.click();
-    window.URL.revokeObjectURL(url);
     document.body.removeChild(a);
-
-    showMessage('Report exported successfully', 'success');
+    window.URL.revokeObjectURL(url);
   } catch (error) {
     showMessage(`Export failed: ${error.message}`, 'danger');
   }

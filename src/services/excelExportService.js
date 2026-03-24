@@ -1,265 +1,163 @@
 const ExcelJS = require('exceljs');
-const dayjs = require('dayjs');
-const utc = require('dayjs/plugin/utc');
-const timezone = require('dayjs/plugin/timezone');
-
-dayjs.extend(utc);
-dayjs.extend(timezone);
 
 /**
- * Generate Excel report with Main/Flower and F&B sheets
- * @param {Object} reportData - Daily report data
- * @param {Array} receipts - Receipt line items
+ * Generate Excel report matching the user's template
+ * @param {string} date - Report date
+ * @param {Object} reportData - Sales summary data
+ * @param {Array} classifiedItems - Items classified into 'main' and 'fb'
  * @param {Array} expenses - Daily expenses
  * @returns {Promise<Buffer>} Excel file buffer
  */
-async function generateExcelReport(reportData, receipts = [], expenses = []) {
+async function generateExcelReport(date, reportData, classifiedItems, expenses) {
   const workbook = new ExcelJS.Workbook();
-  
-  // Add Main/Flower sheet
-  addMainFlowerSheet(workbook, receipts, reportData);
-  
-  // Add F&B sheet
-  addFBSheet(workbook, receipts, reportData);
-  
-  // Add Expenses sheet
-  addExpensesSheet(workbook, expenses, reportData);
-  
-  // Add Summary sheet
-  addSummarySheet(workbook, reportData, receipts, expenses);
-  
-  // Generate buffer
-  const buffer = await workbook.xlsx.writeBuffer();
-  return buffer;
-}
+  const sheet = workbook.addWorksheet('Daily Report');
 
-/**
- * Add Main/Flower sheet to workbook
- */
-function addMainFlowerSheet(workbook, receipts, reportData) {
-  const sheet = workbook.addWorksheet('Main/Flower (M)');
-  
-  // Set column widths
+  // --- STYLING ---
+  const headerFill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFF8ECDA' }
+  };
+  const sectionFill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFCCCCCC' }
+  };
+  const border = {
+    top: { style: 'thin' },
+    left: { style: 'thin' },
+    bottom: { style: 'thin' },
+    right: { style: 'thin' }
+  };
+  const fontBold = { bold: true };
+  const centerAlign = { vertical: 'middle', horizontal: 'center' };
+  const rightAlign = { vertical: 'middle', horizontal: 'right' };
+
+  // --- COLUMNS ---
   sheet.columns = [
-    { header: 'QTY', key: 'qty', width: 10 },
-    { header: 'Item Name', key: 'itemName', width: 25 },
-    { header: 'Unit Price (M)', key: 'unitPrice', width: 15 },
-    { header: 'Total (M)', key: 'total', width: 15 },
+    { header: 'Item Type', key: 'type', width: 20 },
+    { header: 'Item Name', key: 'name', width: 40 },
+    { header: 'Discount', key: 'discount', width: 10 },
+    { header: 'Qty/Grams', key: 'qty', width: 15 },
+    { header: 'Unit Price', key: 'unitPrice', width: 15 },
+    { header: 'Total Price', key: 'totalPrice', width: 15 },
+    { header: 'Payment Method', key: 'payment', width: 20 },
+    { header: 'Total Grams', key: 'totalGrams', width: 15 },
+    { header: 'Note', key: 'note', width: 30 }
   ];
-  
-  // Style header row
-  const headerRow = sheet.getRow(1);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4472C4' } };
-  headerRow.alignment = { horizontal: 'center', vertical: 'center' };
-  
-  // Filter and add Main/Flower items
-  const mainItems = receipts.filter(r => r.category === 'main' || r.category === 'flower');
-  
-  let totalQty = 0;
-  let totalAmount = 0;
-  
+
+  // Format header row
+  sheet.getRow(1).eachCell((cell) => {
+    cell.fill = headerFill;
+    cell.font = fontBold;
+    cell.border = border;
+    cell.alignment = centerAlign;
+  });
+
+  // --- FLOWER / MAIN SECTION ---
+  const mainItems = classifiedItems.filter(item => item.category === 'main');
+  let totalMainGrams = 0;
+  let totalMainPrice = 0;
+
   mainItems.forEach(item => {
-    const qty = parseFloat(item.quantity) || 0;
-    const unitPrice = parseFloat(item.unitPrice) || 0;
-    const total = qty * unitPrice;
-    
-    sheet.addRow({
-      qty: qty.toFixed(3),
-      itemName: item.itemName || 'Unknown',
-      unitPrice: unitPrice.toFixed(2),
-      total: total.toFixed(2),
-    });
-    
-    totalQty += qty;
-    totalAmount += total;
-  });
-  
-  // Add totals row
-  const totalRow = sheet.addRow({
-    qty: totalQty.toFixed(3),
-    itemName: 'TOTAL',
-    unitPrice: '',
-    total: totalAmount.toFixed(2),
-  });
-  
-  totalRow.font = { bold: true };
-  totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFDA' } };
-  
-  // Format currency columns
-  sheet.getColumn('unitPrice').numFmt = '#,##0.00';
-  sheet.getColumn('total').numFmt = '#,##0.00';
-}
+    const qty = parseFloat(item.quantity || 0);
+    const price = parseFloat(item.unitPrice || 0);
+    const total = qty * price;
+    totalMainPrice += total;
+    if (item.itemName.toLowerCase().includes('gram') || item.category === 'main') {
+        totalMainGrams += qty;
+    }
 
-/**
- * Add F&B sheet to workbook
- */
-function addFBSheet(workbook, receipts, reportData) {
-  const sheet = workbook.addWorksheet('F&B');
-  
-  // Set column widths
-  sheet.columns = [
-    { header: 'QTY', key: 'qty', width: 10 },
-    { header: 'Item Name', key: 'itemName', width: 25 },
-    { header: 'Unit Price (F&B)', key: 'unitPrice', width: 15 },
-    { header: 'Total (F&B)', key: 'total', width: 15 },
-  ];
-  
-  // Style header row
-  const headerRow = sheet.getRow(1);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFC5504C' } };
-  headerRow.alignment = { horizontal: 'center', vertical: 'center' };
-  
-  // Filter and add F&B items
-  const fbItems = receipts.filter(r => r.category === 'fb' || r.category === 'food');
-  
-  let totalQty = 0;
-  let totalAmount = 0;
-  
-  fbItems.forEach(item => {
-    const qty = parseFloat(item.quantity) || 0;
-    const unitPrice = parseFloat(item.unitPrice) || 0;
-    const total = qty * unitPrice;
-    
-    sheet.addRow({
-      qty: qty.toFixed(3),
-      itemName: item.itemName || 'Unknown',
-      unitPrice: unitPrice.toFixed(2),
-      total: total.toFixed(2),
+    const row = sheet.addRow({
+      type: 'Flower / Accessories',
+      name: item.itemName,
+      discount: '',
+      qty: qty,
+      unitPrice: price.toFixed(2),
+      totalPrice: total.toFixed(2),
+      payment: 'Sync', // Loyverse doesn't give payment per item easily
+      totalGrams: qty + ' g',
+      note: ''
     });
-    
-    totalQty += qty;
-    totalAmount += total;
+    row.eachCell(cell => cell.border = border);
   });
-  
-  // Add totals row
-  const totalRow = sheet.addRow({
-    qty: totalQty.toFixed(3),
-    itemName: 'TOTAL',
-    unitPrice: '',
-    total: totalAmount.toFixed(2),
-  });
-  
-  totalRow.font = { bold: true };
-  totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFDE5D9' } };
-  
-  // Format currency columns
-  sheet.getColumn('unitPrice').numFmt = '#,##0.00';
-  sheet.getColumn('total').numFmt = '#,##0.00';
-}
 
-/**
- * Add Expenses sheet to workbook
- */
-function addExpensesSheet(workbook, expenses, reportData) {
-  const sheet = workbook.addWorksheet('Expenses');
+  sheet.addRow([]); // Empty row
+
+  // --- EXPENSES SECTION ---
+  const expenseHeader = sheet.addRow(['EXPENSES']);
+  expenseHeader.getCell(1).fill = sectionFill;
+  expenseHeader.getCell(1).font = fontBold;
   
-  // Set column widths
-  sheet.columns = [
-    { header: 'Category', key: 'category', width: 20 },
-    { header: 'Description', key: 'description', width: 30 },
-    { header: 'Amount (THB)', key: 'amount', width: 15 },
-  ];
-  
-  // Style header row
-  const headerRow = sheet.getRow(1);
-  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF70AD47' } };
-  headerRow.alignment = { horizontal: 'center', vertical: 'center' };
-  
+  const expSubHeader = sheet.addRow(['Expense Category', 'Description', 'Amount']);
+  expSubHeader.eachCell(cell => {
+    cell.font = fontBold;
+    cell.border = border;
+  });
+
   let totalExpenses = 0;
-  
-  expenses.forEach(expense => {
-    const amount = parseFloat(expense.amount) || 0;
-    sheet.addRow({
-      category: expense.category || 'Other',
-      description: expense.description || '',
-      amount: amount.toFixed(2),
-    });
+  expenses.forEach(exp => {
+    const amount = parseFloat(exp.amount || 0);
     totalExpenses += amount;
+    const row = sheet.addRow([exp.category, exp.description, amount.toFixed(2)]);
+    row.eachCell(cell => cell.border = border);
   });
-  
-  // Add totals row
-  const totalRow = sheet.addRow({
-    category: 'TOTAL EXPENSES',
-    description: '',
-    amount: totalExpenses.toFixed(2),
-  });
-  
-  totalRow.font = { bold: true };
-  totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2EFD9' } };
-  
-  // Format currency column
-  sheet.getColumn('amount').numFmt = '#,##0.00';
-}
 
-/**
- * Add Summary sheet to workbook
- */
-function addSummarySheet(workbook, reportData, receipts, expenses) {
-  const sheet = workbook.addWorksheet('Summary');
-  
-  // Calculate totals
-  const mainItems = receipts.filter(r => r.category === 'main' || r.category === 'flower');
-  const fbItems = receipts.filter(r => r.category === 'fb' || r.category === 'food');
-  
-  let mainTotal = 0;
-  let fbTotal = 0;
-  let expenseTotal = 0;
-  
-  mainItems.forEach(item => {
-    const qty = parseFloat(item.quantity) || 0;
-    const unitPrice = parseFloat(item.unitPrice) || 0;
-    mainTotal += qty * unitPrice;
+  const expTotalRow = sheet.addRow(['', 'Total Expenses', totalExpenses.toFixed(2)]);
+  expTotalRow.getCell(2).font = fontBold;
+  expTotalRow.getCell(3).font = fontBold;
+  expTotalRow.eachCell(cell => cell.border = border);
+
+  sheet.addRow([]); // Empty row
+
+  // --- FOODS & DRINKS SECTION ---
+  const fbHeader = sheet.addRow(['FOODS & DRINKS']);
+  fbHeader.getCell(1).fill = sectionFill;
+  fbHeader.getCell(1).font = fontBold;
+
+  const fbSubHeader = sheet.addRow(['Item Type', 'Item Name', 'Discount', 'Qty', 'Unit Price', 'Total Price', 'Payment Method', '', 'Note']);
+  fbSubHeader.eachCell(cell => {
+    cell.font = fontBold;
+    cell.border = border;
   });
-  
+
+  const fbItems = classifiedItems.filter(item => item.category === 'fb');
+  let totalFbPrice = 0;
+
   fbItems.forEach(item => {
-    const qty = parseFloat(item.quantity) || 0;
-    const unitPrice = parseFloat(item.unitPrice) || 0;
-    fbTotal += qty * unitPrice;
+    const qty = parseFloat(item.quantity || 0);
+    const price = parseFloat(item.unitPrice || 0);
+    const total = qty * price;
+    totalFbPrice += total;
+
+    const row = sheet.addRow({
+      type: 'Foods & Drinks',
+      name: item.itemName,
+      discount: '',
+      qty: qty,
+      unitPrice: price.toFixed(2),
+      totalPrice: total.toFixed(2),
+      payment: 'Sync',
+      note: ''
+    });
+    row.eachCell(cell => cell.border = border);
   });
-  
-  expenses.forEach(expense => {
-    expenseTotal += parseFloat(expense.amount) || 0;
-  });
-  
-  const netSale = mainTotal + fbTotal;
-  const netCash = netSale - expenseTotal;
-  
-  // Add title
-  const titleRow = sheet.addRow(['Daily Report Summary']);
-  titleRow.font = { bold: true, size: 14 };
-  sheet.mergeCells('A1:B1');
-  
-  // Add date
-  const dateRow = sheet.addRow(['Date', dayjs(reportData.date).format('YYYY-MM-DD')]);
-  dateRow.font = { bold: true };
-  
+
   sheet.addRow([]); // Empty row
-  
-  // Add summary data
-  sheet.addRow(['Main/Flower Sales (M)', `${Number(mainTotal || 0).toFixed(2)} THB`]);
-  sheet.addRow(['F&B Sales', `${Number(fbTotal || 0).toFixed(2)} THB`]);
-  sheet.addRow(['Net Sale', `${Number(netSale || 0).toFixed(2)} THB`]);
-  
-  sheet.addRow([]); // Empty row
-  
-  sheet.addRow(['Payment Breakdown']);
-  sheet.addRow(['Cash Total', `${Number(reportData.cash_total || 0).toFixed(2)} THB`]);
-  sheet.addRow(['Card Total', `${Number(reportData.card_total || 0).toFixed(2)} THB`]);
-  
-  sheet.addRow([]); // Empty row
-  
-  sheet.addRow(['Expenses', `${Number(expenseTotal || 0).toFixed(2)} THB`]);
-  sheet.addRow(['Net Cash', `${Number(netCash || 0).toFixed(2)} THB`]);
-  
-  // Format currency columns
-  sheet.getColumn('B').numFmt = '#,##0.00';
-  sheet.getColumn('B').width = 20;
-  sheet.getColumn('A').width = 25;
+
+  // --- SUMMARY SECTION ---
+  const summaryHeader = sheet.addRow(['SUMMARY']);
+  summaryHeader.getCell(1).font = fontBold;
+
+  sheet.addRow(['Total Main Sales', totalMainPrice.toFixed(2) + ' THB']);
+  sheet.addRow(['Total F&B Sales', totalFbPrice.toFixed(2) + ' THB']);
+  sheet.addRow(['Total Expenses', totalExpenses.toFixed(2) + ' THB']);
+  const netSale = (totalMainPrice + totalFbPrice - totalExpenses);
+  const netRow = sheet.addRow(['NET SALE', netSale.toFixed(2) + ' THB']);
+  netRow.getCell(1).font = fontBold;
+  netRow.getCell(2).font = fontBold;
+
+  return await workbook.xlsx.writeBuffer();
 }
 
-module.exports = {
-  generateExcelReport,
-};
+module.exports = { generateExcelReport };

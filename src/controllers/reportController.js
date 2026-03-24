@@ -341,14 +341,23 @@ async function exportToExcel(req, res, next) {
     const receipts = await fetchClosedReceiptsByDate(date);
     const classifiedReceipts = classifyItems(receipts);
 
-    // Get expenses
-    const expenseRows = await query(
-      `SELECT * FROM daily_expenses WHERE date = ${placeholder(1)} ORDER BY created_at`,
-      [date]
-    );
+    //     // Get expenses from query param (if provided by frontend LocalStorage)
+    let expenses = [];
+    if (req.query.expenses) {
+      try {
+        expenses = JSON.parse(req.query.expenses);
+      } catch (e) {
+        console.error('Error parsing expenses from query:', e);
+      }
+    } else {
+      // Fallback to database if no query param
+      expenses = await query(
+        `SELECT * FROM daily_expenses WHERE date = ${placeholder(1)} ORDER BY created_at DESC`,
+        [date]
+      );
+    }
 
-    // Generate Excel
-    const buffer = await generateExcelReport(reportData, classifiedReceipts, expenseRows);
+    const buffer = await generateExcelReport(date, reportRows[0], classifiedReceipts, expenses);
 
     // Send file
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
