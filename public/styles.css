@@ -66,6 +66,14 @@ body {
   outline-offset: 2px;
 }
 
+.btn-xs {
+  padding: 0.15rem 0.4rem;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  border-radius: 0.2rem;
+  font-weight: 600;
+}
+
 .brand-logo {
   max-height: 45px;
   width: auto;

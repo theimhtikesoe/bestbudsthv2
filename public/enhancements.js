@@ -14,6 +14,8 @@ const EXPENSE_CATEGORIES = [
   'Other'
 ];
 
+let currentEditingExpenseId = null;
+
 /**
  * Get expenses from LocalStorage
  */
@@ -32,13 +34,14 @@ function saveLocalExpenses(date, expenses) {
 }
 
 /**
- * Add expense to the daily report (LocalStorage Version)
+ * Add or Update expense (LocalStorage Version)
  */
 async function addExpenseToReport() {
   const dateInput = document.getElementById('reportDate');
   const categorySelect = document.getElementById('expenseCategory');
   const descriptionInput = document.getElementById('expenseDescription');
   const amountInput = document.getElementById('expenseAmount');
+  const submitBtn = document.querySelector('#expenseSection button');
 
   const date = dateInput?.value;
   const category = categorySelect?.value;
@@ -51,26 +54,77 @@ async function addExpenseToReport() {
   }
 
   try {
-    const expenses = getLocalExpenses(date);
-    const newExpense = {
-      id: Date.now(),
-      date,
-      category,
-      description,
-      amount,
-      created_at: new Date().toISOString()
-    };
+    let expenses = getLocalExpenses(date);
+
+    if (currentEditingExpenseId) {
+      // Update existing
+      expenses = expenses.map(exp => {
+        if (exp.id === currentEditingExpenseId) {
+          return { ...exp, category, description, amount };
+        }
+        return exp;
+      });
+      showMessage('Expense updated successfully', 'success');
+      currentEditingExpenseId = null;
+      if (submitBtn) submitBtn.textContent = 'Add Expense';
+    } else {
+      // Add new
+      const newExpense = {
+        id: Date.now(),
+        date,
+        category,
+        description,
+        amount,
+        created_at: new Date().toISOString()
+      };
+      expenses.push(newExpense);
+      showMessage('Expense added successfully', 'success');
+    }
     
-    expenses.push(newExpense);
     saveLocalExpenses(date, expenses);
 
-    showMessage('Expense added successfully (Local)', 'success');
+    // Clear form
+    categorySelect.value = '';
     descriptionInput.value = '';
     amountInput.value = '';
+    
     renderExpensesList(expenses, date);
   } catch (error) {
     showMessage(`Error: ${error.message}`, 'danger');
   }
+}
+
+/**
+ * Edit an expense (Load into form)
+ */
+function editExpense(id, date) {
+  const expenses = getLocalExpenses(date);
+  const expense = expenses.find(e => e.id === id);
+  
+  if (!expense) return;
+
+  document.getElementById('expenseCategory').value = expense.category;
+  document.getElementById('expenseDescription').value = expense.description || '';
+  document.getElementById('expenseAmount').value = expense.amount;
+  
+  currentEditingExpenseId = id;
+  const submitBtn = document.querySelector('#expenseSection button');
+  if (submitBtn) submitBtn.textContent = 'Update Expense';
+  
+  // Scroll to form
+  document.getElementById('expenseSection').scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Cancel editing
+ */
+function cancelEdit() {
+  currentEditingExpenseId = null;
+  document.getElementById('expenseCategory').value = '';
+  document.getElementById('expenseDescription').value = '';
+  document.getElementById('expenseAmount').value = '';
+  const submitBtn = document.querySelector('#expenseSection button');
+  if (submitBtn) submitBtn.textContent = 'Add Expense';
 }
 
 /**
@@ -82,7 +136,7 @@ async function loadExpenses(date) {
 }
 
 /**
- * Render expenses list in the UI
+ * Render expenses list in the UI with Edit and Delete buttons
  */
 function renderExpensesList(expenses, date) {
   const container = document.getElementById('expensesList');
@@ -93,7 +147,19 @@ function renderExpensesList(expenses, date) {
     return;
   }
 
-  let html = '<table class="table table-sm"><thead><tr><th>Category</th><th>Description</th><th>Amount</th><th>Action</th></tr></thead><tbody>';
+  let html = `
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Amount</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+  `;
 
   let total = 0;
   expenses.forEach(expense => {
@@ -101,23 +167,28 @@ function renderExpensesList(expenses, date) {
     total += amount;
     html += `
       <tr>
-        <td>${expense.category}</td>
+        <td><span class="badge bg-secondary">${expense.category}</span></td>
         <td>${expense.description || '-'}</td>
-        <td>${amount.toFixed(2)} THB</td>
-        <td>
-          <button class="btn btn-sm btn-danger" onclick="deleteExpense(${expense.id}, '${date}')">Delete</button>
+        <td class="fw-bold">${amount.toLocaleString()} THB</td>
+        <td class="text-end">
+          <button class="btn btn-xs btn-outline-info me-1" onclick="editExpense(${expense.id}, '${date}')">Edit</button>
+          <button class="btn btn-xs btn-outline-danger" onclick="deleteExpense(${expense.id}, '${date}')">Delete</button>
         </td>
       </tr>
     `;
   });
 
   html += `
-    <tr class="table-active fw-bold">
-      <td colspan="2">Total Expenses</td>
-      <td>${total.toFixed(2)} THB</td>
-      <td></td>
-    </tr>
-  </tbody></table>`;
+        </tbody>
+        <tfoot class="table-light">
+          <tr class="fw-bold">
+            <td colspan="2">Total Expenses</td>
+            <td colspan="2" class="text-primary">${total.toLocaleString()} THB</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  `;
 
   container.innerHTML = html;
 }
@@ -135,6 +206,10 @@ async function deleteExpense(id, date) {
 
     showMessage('Expense deleted', 'success');
     renderExpensesList(expenses, date);
+    
+    if (currentEditingExpenseId === id) {
+      cancelEdit();
+    }
   } catch (error) {
     showMessage(`Error: ${error.message}`, 'danger');
   }
