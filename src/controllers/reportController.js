@@ -357,7 +357,7 @@ async function exportToExcel(req, res, next) {
       );
     }
 
-    const buffer = await generateExcelReport(date, reportRows[0], classifiedReceipts, expenses);
+    const buffer = await generateExcelReport(date, reportRows[0], receipts, expenses);
 
     // Send file
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
