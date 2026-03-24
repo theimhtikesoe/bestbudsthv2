@@ -236,9 +236,12 @@ function showMessage(text, type = 'info') {
  * Initialize enhancements
  */
 function initializeEnhancements() {
-  // Create expense form if it doesn't exist
+  console.log('Initializing Enhancements...');
   const reportSection = document.getElementById('reportSection');
+  
+  // 1. Restore Expense Section
   if (reportSection && !document.getElementById('expenseSection')) {
+    console.log('Creating Expense Section...');
     const expenseHTML = `
       <div id="expenseSection" class="mt-4">
         <h2 class="h5 mb-3">Daily Expenses</h2>
@@ -267,38 +270,32 @@ function initializeEnhancements() {
         </div>
       </div>
     `;
-    // Find the Net Sale row and insert after it
+    
+    // Position it after the Net Sale row
     const netSaleInput = document.getElementById('netSale');
     if (netSaleInput) {
       const row = netSaleInput.closest('.row');
       if (row) {
         row.insertAdjacentHTML('afterend', expenseHTML);
       } else {
-        reportSection.insertAdjacentHTML('afterend', expenseHTML);
+        reportSection.querySelector('.card-body').insertAdjacentHTML('beforeend', expenseHTML);
       }
     } else {
-      reportSection.insertAdjacentHTML('afterend', expenseHTML);
+      reportSection.querySelector('.card-body').insertAdjacentHTML('beforeend', expenseHTML);
     }
   }
 
-  // Create classification stats section if it doesn't exist
-  if (!document.getElementById('classificationStats')) {
-    const statsHTML = `
-      <div id="classificationStats" class="mt-4"></div>
-    `;
-    const mainContent = document.querySelector('.app-main-content');
-    if (mainContent) {
-      mainContent.insertAdjacentHTML('beforeend', statsHTML);
-    }
-  }
-
-  // Update export button to use new function
+  // 2. Setup Export Button
   const exportBtn = document.getElementById('exportCsvBtn');
   if (exportBtn) {
-    exportBtn.onclick = exportReportToExcel;
+    console.log('Binding Export Button...');
+    exportBtn.onclick = function(e) {
+      e.preventDefault();
+      exportReportToExcel();
+    };
   }
 
-  // Load expenses when date changes
+  // 3. Date Change Listener
   const dateInput = document.getElementById('reportDate');
   if (dateInput) {
     dateInput.addEventListener('change', (e) => {
@@ -306,6 +303,10 @@ function initializeEnhancements() {
         loadExpenses(e.target.value);
       }
     });
+    // Initial load if date is already set
+    if (dateInput.value) {
+      loadExpenses(dateInput.value);
+    }
   }
 }
 
