@@ -312,11 +312,143 @@ async function getReportsSummary(req, res, next) {
   }
 }
 
+/**
+ * Export report to Excel
+ */
+async function exportToExcel(req, res, next) {
+  try {
+    const { date } = req.params;
+    validateDateOrThrow(date);
+
+    const { generateExcelReport } = require('../services/excelExportService');
+    const { classifyItems } = require('../services/itemClassifier');
+    const { fetchReceiptsByDate } = require('../services/loyverseService');
+
+    // Get report data
+    const reportRows = await query(
+      `SELECT * FROM daily_reports WHERE date = ${placeholder(1)}`,
+      [date]
+    );
+    const reportData = reportRows[0];
+
+    if (!reportData) {
+      const error = new Error('Report not found');
+      error.status = 404;
+      throw error;
+    }
+
+    // Get receipts from Loyverse
+    const receipts = await fetchReceiptsByDate(date);
+    const classifiedReceipts = classifyItems(receipts);
+
+    // Get expenses
+    const expenseRows = await query(
+      `SELECT * FROM daily_expenses WHERE date = ${placeholder(1)} ORDER BY created_at`,
+      [date]
+    );
+
+    // Generate Excel
+    const buffer = await generateExcelReport(reportData, classifiedReceipts, expenseRows);
+
+    // Send file
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="Daily-Report-${date}.xlsx"`);
+    res.send(buffer);
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * Add expense
+ */
+async function addExpense(req, res, next) {
+  try {
+    const { date, category, description, amount } = req.body;
+
+    validateDateOrThrow(date);
+
+    if (!category || !amount) {
+      const error = new Error('Category and amount are required');
+      error.status = 400;
+      throw error;
+    }
+
+    const expenseAmount = toNumber(amount);
+    if (expenseAmount < 0) {
+      const error = new Error('Amount must be non-negative');
+      error.status = 400;
+      throw error;
+    }
+
+    const sql = isPostgres
+      ? `INSERT INTO daily_expenses (date, category, description, amount, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *`
+      : `INSERT INTO daily_expenses (date, category, description, amount, created_at) VALUES (?, ?, ?, ?, NOW())`;
+
+    const result = await query(sql, [date, category, description || '', expenseAmount]);
+
+    res.status(201).json({
+      success: true,
+      expense: isPostgres ? result.rows[0] : result[0]
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * Remove expense
+ */
+async function removeExpense(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const sql = isPostgres
+      ? `DELETE FROM daily_expenses WHERE id = $1 RETURNING *`
+      : `DELETE FROM daily_expenses WHERE id = ?`;
+
+    await query(sql, [id]);
+
+    res.json({ success: true, message: 'Expense deleted' });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+/**
+ * List expenses for a date
+ */
+async function listExpenses(req, res, next) {
+  try {
+    const { date } = req.params;
+    validateDateOrThrow(date);
+
+    const sql = isPostgres
+      ? `SELECT * FROM daily_expenses WHERE date = $1 ORDER BY created_at DESC`
+      : `SELECT * FROM daily_expenses WHERE date = ? ORDER BY created_at DESC`;
+
+    const result = await query(sql, [date]);
+    const expenses = isPostgres ? result.rows : result;
+
+    res.json({
+      date,
+      expenses,
+      total: expenses.reduce((sum, e) => sum + toNumber(e.amount), 0)
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   syncFromLoyverse,
   getReportByDate,
   upsertReport,
   listReports,
   getLast7DayNetSales,
-  getReportsSummary
+  getReportsSummary,
+  exportToExcel,
+  addExpense,
+  removeExpense,
+  listExpenses
 };

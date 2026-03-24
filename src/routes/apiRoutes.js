@@ -5,7 +5,11 @@ const {
   upsertReport,
   listReports,
   getLast7DayNetSales,
-  getReportsSummary
+  getReportsSummary,
+  exportToExcel,
+  addExpense,
+  removeExpense,
+  listExpenses
 } = require('../controllers/reportController');
 
 const router = express.Router();
@@ -41,5 +45,13 @@ router.get('/reports/summary', getReportsSummary);
 router.get('/reports', listReports);
 router.get('/reports/:date', getReportByDate);
 router.post('/reports', upsertReport);
+
+// Excel export
+router.get('/reports/:date/export', exportToExcel);
+
+// Expense management
+router.post('/expenses', addExpense);
+router.delete('/expenses/:id', removeExpense);
+router.get('/expenses/:date', listExpenses);
 
 module.exports = router;

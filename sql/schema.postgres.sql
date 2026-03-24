@@ -20,3 +20,29 @@ CREATE TABLE IF NOT EXISTS daily_reports (
 );
 
 CREATE INDEX IF NOT EXISTS idx_daily_reports_date ON daily_reports (date);
+
+
+CREATE TABLE IF NOT EXISTS daily_expenses (
+  id SERIAL PRIMARY KEY,
+  date DATE NOT NULL,
+  category VARCHAR(50) NOT NULL,
+  description VARCHAR(255),
+  amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (date) REFERENCES daily_reports(date) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_expenses_date ON daily_expenses (date);
+
+CREATE TYPE category_enum AS ENUM ('main', 'fb');
+
+CREATE TABLE IF NOT EXISTS item_classifications (
+  id SERIAL PRIMARY KEY,
+  item_name VARCHAR(255) NOT NULL UNIQUE,
+  category category_enum NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_item_classifications_name ON item_classifications (item_name);
