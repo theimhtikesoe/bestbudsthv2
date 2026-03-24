@@ -56,11 +56,25 @@ function classifyItem(itemName, unitPrice) {
  * @param {Array} items - Array of items with name and unitPrice
  * @returns {Array} Items with added category field
  */
-function classifyItems(items) {
-  return items.map(item => ({
-    ...item,
-    category: classifyItem(item.itemName, item.unitPrice),
-  }));
+function classifyItems(receipts) {
+  const allItems = [];
+  receipts.forEach(receipt => {
+    const lineItems = receipt.line_items || receipt.items || [];
+    lineItems.forEach(item => {
+      const itemName = item.item_name || item.name || 'Unknown';
+      const unitPrice = parseFloat(item.unit_price || item.price || 0);
+      const quantity = parseFloat(item.quantity || item.qty || 0);
+      
+      allItems.push({
+        ...item,
+        itemName,
+        unitPrice,
+        quantity,
+        category: classifyItem(itemName, unitPrice)
+      });
+    });
+  });
+  return allItems;
 }
 
 /**

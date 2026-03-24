@@ -239,20 +239,20 @@ function addSummarySheet(workbook, reportData, receipts, expenses) {
   sheet.addRow([]); // Empty row
   
   // Add summary data
-  sheet.addRow(['Main/Flower Sales (M)', `${mainTotal.toFixed(2)} THB`]);
-  sheet.addRow(['F&B Sales', `${fbTotal.toFixed(2)} THB`]);
-  sheet.addRow(['Net Sale', `${netSale.toFixed(2)} THB`]);
+  sheet.addRow(['Main/Flower Sales (M)', `${Number(mainTotal || 0).toFixed(2)} THB`]);
+  sheet.addRow(['F&B Sales', `${Number(fbTotal || 0).toFixed(2)} THB`]);
+  sheet.addRow(['Net Sale', `${Number(netSale || 0).toFixed(2)} THB`]);
   
   sheet.addRow([]); // Empty row
   
   sheet.addRow(['Payment Breakdown']);
-  sheet.addRow(['Cash Total', `${(reportData.cash_total || 0).toFixed(2)} THB`]);
-  sheet.addRow(['Card Total', `${(reportData.card_total || 0).toFixed(2)} THB`]);
+  sheet.addRow(['Cash Total', `${Number(reportData.cash_total || 0).toFixed(2)} THB`]);
+  sheet.addRow(['Card Total', `${Number(reportData.card_total || 0).toFixed(2)} THB`]);
   
   sheet.addRow([]); // Empty row
   
-  sheet.addRow(['Expenses', `${expenseTotal.toFixed(2)} THB`]);
-  sheet.addRow(['Net Cash', `${netCash.toFixed(2)} THB`]);
+  sheet.addRow(['Expenses', `${Number(expenseTotal || 0).toFixed(2)} THB`]);
+  sheet.addRow(['Net Cash', `${Number(netCash || 0).toFixed(2)} THB`]);
   
   // Format currency columns
   sheet.getColumn('B').numFmt = '#,##0.00';

@@ -322,7 +322,7 @@ async function exportToExcel(req, res, next) {
 
     const { generateExcelReport } = require('../services/excelExportService');
     const { classifyItems } = require('../services/itemClassifier');
-    const { fetchReceiptsByDate } = require('../services/loyverseService');
+    const { fetchClosedReceiptsByDate } = require('../services/loyverseService');
 
     // Get report data
     const reportRows = await query(
@@ -338,7 +338,7 @@ async function exportToExcel(req, res, next) {
     }
 
     // Get receipts from Loyverse
-    const receipts = await fetchReceiptsByDate(date);
+    const receipts = await fetchClosedReceiptsByDate(date);
     const classifiedReceipts = classifyItems(receipts);
 
     // Get expenses
@@ -389,7 +389,7 @@ async function addExpense(req, res, next) {
 
     res.status(201).json({
       success: true,
-      expense: isPostgres ? result.rows[0] : result[0]
+      expense: isPostgres ? result[0] : result[0]
     });
   } catch (error) {
     return next(error);
@@ -427,8 +427,7 @@ async function listExpenses(req, res, next) {
       ? `SELECT * FROM daily_expenses WHERE date = $1 ORDER BY created_at DESC`
       : `SELECT * FROM daily_expenses WHERE date = ? ORDER BY created_at DESC`;
 
-    const result = await query(sql, [date]);
-    const expenses = isPostgres ? result.rows : result;
+    const expenses = await query(sql, [date]);
 
     res.json({
       date,
