@@ -1,6 +1,6 @@
 /**
  * Enhanced Daily Reports - Item Classification & Expense Tracking
- * Integrates with the existing app.js
+ * Integrates with the existing app.js and index.html
  */
 
 // Expense categories
@@ -138,6 +138,8 @@ async function deleteExpense(id, date) {
   } catch (error) {
     showMessage(`Error: ${error.message}`, 'danger');
   }
+}
+
 /**
  * Export report to Excel with classification
  */
@@ -175,48 +177,6 @@ async function exportReportToExcel() {
 }
 
 /**
- * Display item classification statistics
- */
-function displayClassificationStats(stats) {
-  const container = document.getElementById('classificationStats');
-  if (!container) return;
-
-  const html = `
-    <div class="row g-3">
-      <div class="col-md-3">
-        <div class="card">
-          <div class="card-body">
-            <h6 class="card-title">Main/Flower Items</h6>
-            <p class="card-text h4">${stats.mainCount}</p>
-            <small class="text-muted">${stats.mainTotal} THB</small>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card">
-          <div class="card-body">
-            <h6 class="card-title">F&B Items</h6>
-            <p class="card-text h4">${stats.fbCount}</p>
-            <small class="text-muted">${stats.fbTotal} THB</small>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-3">
-        <div class="card">
-          <div class="card-body">
-            <h6 class="card-title">Total Items</h6>
-            <p class="card-text h4">${stats.mainCount + stats.fbCount}</p>
-            <small class="text-muted">${stats.totalAmount} THB</small>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  container.innerHTML = html;
-}
-
-/**
  * Show message to user
  */
 function showMessage(text, type = 'info') {
@@ -237,55 +197,8 @@ function showMessage(text, type = 'info') {
  */
 function initializeEnhancements() {
   console.log('Initializing Enhancements...');
-  const reportSection = document.getElementById('reportSection');
   
-  // 1. Restore Expense Section
-  if (reportSection && !document.getElementById('expenseSection')) {
-    console.log('Creating Expense Section...');
-    const expenseHTML = `
-      <div id="expenseSection" class="mt-4">
-        <h2 class="h5 mb-3">Daily Expenses</h2>
-        <div class="detail-box p-3">
-          <div class="row g-3 mb-3">
-            <div class="col-md-3">
-              <label for="expenseCategory" class="form-label small text-muted">Category</label>
-              <select id="expenseCategory" class="form-select form-select-sm">
-                <option value="">Select Category</option>
-                ${EXPENSE_CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
-              </select>
-            </div>
-            <div class="col-md-4">
-              <label for="expenseDescription" class="form-label small text-muted">Description</label>
-              <input id="expenseDescription" type="text" class="form-control form-control-sm" placeholder="Optional" />
-            </div>
-            <div class="col-md-2">
-              <label for="expenseAmount" class="form-label small text-muted">Amount (THB)</label>
-              <input id="expenseAmount" type="number" min="0" step="0.01" class="form-control form-control-sm" />
-            </div>
-            <div class="col-md-3 d-flex align-items-end">
-              <button onclick="addExpenseToReport()" class="btn btn-sm btn-success w-100 fw-bold">Add Expense</button>
-            </div>
-          </div>
-          <div id="expensesList" class="mt-3"></div>
-        </div>
-      </div>
-    `;
-    
-    // Position it after the Net Sale row
-    const netSaleInput = document.getElementById('netSale');
-    if (netSaleInput) {
-      const row = netSaleInput.closest('.row');
-      if (row) {
-        row.insertAdjacentHTML('afterend', expenseHTML);
-      } else {
-        reportSection.querySelector('.card-body').insertAdjacentHTML('beforeend', expenseHTML);
-      }
-    } else {
-      reportSection.querySelector('.card-body').insertAdjacentHTML('beforeend', expenseHTML);
-    }
-  }
-
-  // 2. Setup Export Button
+  // 1. Setup Export Button
   const exportBtn = document.getElementById('exportCsvBtn');
   if (exportBtn) {
     console.log('Binding Export Button...');
@@ -295,7 +208,7 @@ function initializeEnhancements() {
     };
   }
 
-  // 3. Date Change Listener
+  // 2. Date Change Listener
   const dateInput = document.getElementById('reportDate');
   if (dateInput) {
     dateInput.addEventListener('change', (e) => {
