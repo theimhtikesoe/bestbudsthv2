@@ -302,7 +302,7 @@ async function exportReportToExcel() {
             name: item.name || item.item_name,
             qty: qty,
             unitPrice: grossPrice / (qty || 1),
-            totalPrice: itemNetPrice,
+            totalPrice: itemNetPrice, // This is already net price (after discount)
             discount: discountStr,
             payment: paymentMethod,
             note: receiptNumber

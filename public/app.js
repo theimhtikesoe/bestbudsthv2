@@ -164,7 +164,10 @@ function normalizeEntries(entries) {
     let mainAccTotal = 0, fbTotal = 0;
     
     if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
-      amount = entry.amount ?? entry.money_amount?.amount ?? entry.amount_money?.amount ?? entry.total_money?.amount ?? 0;
+      // Prioritize discounted amount if available (net amount)
+      // Loyverse usually provides 'total_money' or 'amount' as the final paid amount
+      amount = entry.total_money?.amount ?? entry.amount_money?.amount ?? entry.money_amount?.amount ?? entry.amount ?? 0;
+      
       percentage = parsePercentage(entry.percentage ?? entry.percent ?? entry.rate);
       time = entry.time || null;
       receiptNumber = entry.receiptNumber || entry.receipt_number || entry.number || null;
