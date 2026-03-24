@@ -565,199 +565,104 @@ if (document.readyState === 'loading') {
 
 // --- 📥 EXCEL EXPORT ENGINE (BEAUTIFUL .XLSX FORMAT) ---
 async function exportToExcel() {
-  if (!lastSyncedData || !lastSyncedData.orders) {
-    alert("Please Sync From Loyverse first before exporting!");
-    return;
-  }
-  if (typeof ExcelJS === 'undefined') {
-    alert("Excel Library is loading. Please try again in a few seconds.");
-    return;
-  }
+    try {
+        const reportDate = els.reportDate.value;
+        const syncResponse = await fetch(`/api/loyverse/sync?date=${reportDate}`);
+        const data = await syncResponse.json();
 
-  const orders = lastSyncedData.orders;
-  let mainRows = [];
-  let fbRows = [];
-  let totalDailyGrams = 0;
+        if (!data || !data.automated_report_rows) {
+            alert("Please sync data before exporting.");
+            return;
+        }
 
-  // --- Data Preparation Logic ---
-  orders.forEach(order => {
-    const items = order.line_items || order.items || [];
-    
-    // --- ROBUST PAYMENT METHOD SCANNER ---
-    let rawPayment = "";
-    if (order.payments && order.payments.length > 0) {
-        rawPayment = String(order.payments[0].name || order.payments[0].payment_type || order.payments[0].tender_type || "").toUpperCase();
-    } else {
-        rawPayment = String(order.payment_type || order.tender_type || "CASH").toUpperCase();
+        const workbook = new ExcelJS.Workbook();
+        const sheet = workbook.addWorksheet('Daily Report');
+
+        // Column Config
+        sheet.columns = [
+            { header: 'Item Type', key: 'type', width: 20 },
+            { header: 'Item Name', key: 'name', width: 40 },
+            { header: 'Discount', key: 'discount', width: 10 },
+            { header: 'Qty/Grams', key: 'qty', width: 15 },
+            { header: 'Unit Price', key: 'unit', width: 15 },
+            { header: 'Total Price', key: 'total', width: 15 },
+            { header: 'Payment Method', key: 'payment', width: 18 },
+            { header: 'Total Grams', key: 'grams', width: 15 },
+            { header: 'Note', key: 'note', width: 25 }
+        ];
+
+        // Styling Helpers
+        const styleHeader = (row, color) => {
+            row.eachCell(cell => {
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: color } };
+                cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+            });
+        };
+
+        // --- SECTION 1: FLOWERS & ACCESSORIES ---
+        const header1 = sheet.getRow(1);
+        styleHeader(header1, 'FF2C3E50'); // Dark Blue
+
+        data.automated_report_rows.forEach(item => {
+            // Only push if it's Flower or Accessory (Numerator)
+            if (item.numerator_price > 0) {
+                sheet.addRow({
+                    type: item.gram_qty > 0 ? 'Flower' : 'Accessories',
+                    name: item.item_name,
+                    qty: item.gram_qty > 0 ? item.gram_qty : 1,
+                    total: item.numerator_price,
+                    grams: item.gram_qty > 0 ? `${item.gram_qty} g` : ''
+                });
+            }
+        });
+
+        sheet.addRow([]); // Gap
+
+        // --- SECTION 2: EXPENSES ---
+        const expTitleRow = sheet.addRow(['EXPENSES']);
+        expTitleRow.font = { bold: true, size: 14 };
+        
+        const expHeader = sheet.addRow(['Expense Category', 'Description', 'Amount']);
+        styleHeader(expHeader, 'FFE74C3C'); // Red
+
+        // Get expenses from UI inputs
+        const expenseAmt = parseFloat(document.getElementById('expense')?.value || 0);
+        if (expenseAmt > 0) {
+            sheet.addRow(['Operational', 'Daily Expenses', '', '', '', expenseAmt]);
+        }
+
+        sheet.addRow([]); // Gap
+
+        // --- SECTION 3: FOODS & DRINKS ---
+        const fbTitleRow = sheet.addRow(['FOODS & DRINKS']);
+        fbTitleRow.font = { bold: true, size: 14 };
+
+        const fbHeader = sheet.addRow(['Item Name', 'Discount', 'Qty', 'Unit Price', 'Total Price', 'Payment Method']);
+        styleHeader(fbHeader, 'FF2980B9'); // Blue
+
+        data.automated_report_rows.forEach(item => {
+            if (item.denominator_price > 0) {
+                sheet.addRow({
+                    type: 'F&B',
+                    name: item.item_name,
+                    total: item.denominator_price
+                });
+            }
+        });
+
+        // Final Borders for all cells
+        sheet.eachRow(row => {
+            row.eachCell(cell => {
+                cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
+            });
+        });
+
+        const buffer = await workbook.xlsx.writeBuffer();
+        saveAs(new Blob([buffer]), `BestBuds_Report_${reportDate}.xlsx`);
+
+    } catch (err) {
+        console.error(err);
+        alert("Export failed: " + err.message);
     }
-
-    let paymentMethod = "Cash";
-    if (rawPayment.includes('CARD') || rawPayment.includes('CREDIT') || rawPayment.includes('VISA') || rawPayment.includes('MASTER')) {
-        paymentMethod = "Card";
-    } else if (rawPayment.includes('TRANSFER') || rawPayment.includes('BANK') || rawPayment.includes('PROMPT') || rawPayment.includes('KBANK') || rawPayment.includes('SCB') || rawPayment.includes('QR')) {
-        paymentMethod = "Transfer";
-    }
-    // -------------------------------------
-    
-    const orderTotalMoney = Number(order.total_money || 0); 
-    const orderDiscountMoney = Number(order.total_discount || 0);
-    const hasOrderDiscount = orderDiscountMoney > 0;
-
-    let orderDiscountPercent = 0;
-    if (hasOrderDiscount && (orderTotalMoney + orderDiscountMoney) > 0) {
-       orderDiscountPercent = (orderDiscountMoney / (orderTotalMoney + orderDiscountMoney));
-    }
-
-    let orderMainItems = [];
-    let orderFBItems = [];
-    let orderGrams = 0;
-
-    items.forEach(item => {
-      let rawItemName = item.item_name || item.name || "Unknown";
-      let itemName = String(rawItemName).toLowerCase();
-      let category = String(item.category_name || "").toLowerCase();
-      let qty = Number(item.quantity || item.qty || 0);
-      let unitPrice = Number(item.price || 0);
-      let grossPrice = unitPrice * qty;
-      
-      let itemNetPrice = grossPrice;
-      if (hasOrderDiscount) { itemNetPrice = grossPrice - (grossPrice * orderDiscountPercent); }
-
-      let discountDisplay = orderDiscountPercent > 0 ? orderDiscountPercent.toFixed(2) : "";
-      let discountNote = orderDiscountPercent > 0 ? `${(orderDiscountPercent * 100).toFixed(0)}% dis- ${Math.round(grossPrice * orderDiscountPercent)}` : "";
-
-      let isFreeItem = (unitPrice === 0) || (itemNetPrice === 0) || itemName.includes('free');
-      if (itemName.includes('lemon cherry') && grossPrice >= 4970) { qty = 7; }
-
-      // --- ROBUST CATEGORIZATION ---
-      let isAcc = ['accessories', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'tray']
-                  .some(keyword => itemName.includes(keyword) || category.includes(keyword));
-      
-      let isFBKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk']
-                         .some(keyword => itemName.includes(keyword) || category.includes(keyword));
-      
-      // Prevent Free items and Pina Colada from becoming F&B just because price is <= 50
-      let isCheapFB = (qty > 0 && (grossPrice / qty) <= 50 && !isFreeItem && !itemName.includes('pina colada'));
-      
-      let isFB = isFBKeywords || isCheapFB;
-      // ------------------------------
-
-      if (isFB) {
-         orderFBItems.push({ name: rawItemName, discountDisplay, qty, unitPrice, itemNetPrice, discountNote });
-      } else {
-         let itemType = isAcc ? "Accessories" : "Flower";
-         let gramVal = (!isFreeItem && !isAcc) ? qty : 0;
-         orderMainItems.push({ type: itemType, name: rawItemName, discountDisplay, qty, unitPrice, itemNetPrice, discountNote, gramVal });
-         if (!isFreeItem) orderGrams += gramVal;
-      }
-    });
-
-    if (orderMainItems.length > 0) {
-        let types = [...new Set(orderMainItems.map(i => i.type))].join(" / ");
-        let names = orderMainItems.map(i => i.name).join(" / ");
-        let qtys = orderMainItems.map(i => i.qty).join(" / ");
-        let unitPrices = orderMainItems.map(i => i.unitPrice.toFixed(2)).join(" / ");
-        let totalPrice = orderMainItems.reduce((sum, i) => sum + i.itemNetPrice, 0);
-        let discounts = [...new Set(orderMainItems.map(i => i.discountDisplay))].filter(Boolean).join(" / ");
-        let notes = [...new Set(orderMainItems.map(i => i.discountNote))].filter(Boolean).join(", ");
-        let gramDisplay = orderGrams > 0 ? `${orderGrams} g` : "";
-
-        mainRows.push({ type: types, name: names, discount: discounts, qty: qtys, unitPrice: unitPrices, totalPrice: totalPrice, payment: paymentMethod, grams: gramDisplay, note: notes });
-        totalDailyGrams += orderGrams;
-    }
-
-    if (orderFBItems.length > 0) {
-        let names = orderFBItems.map(i => i.name).join(" / ");
-        let qtys = orderFBItems.map(i => i.qty).join(" / ");
-        let unitPrices = orderFBItems.map(i => i.unitPrice.toFixed(2)).join(" / ");
-        let totalPrice = orderFBItems.reduce((sum, i) => sum + i.itemNetPrice, 0);
-        let discounts = [...new Set(orderFBItems.map(i => i.discountDisplay))].filter(Boolean).join(" / ");
-        let notes = [...new Set(orderFBItems.map(i => i.discountNote))].filter(Boolean).join(", ");
-
-        fbRows.push({ type: "Foods & Drinks", name: names, discount: discounts, qty: qtys, unitPrice: unitPrices, totalPrice: totalPrice, payment: paymentMethod, grams: "", note: notes });
-    }
-  });
-
-  // --- 🎨 Excel Styling & Creation ---
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Daily Report');
-
-  // Set Column Widths
-  sheet.columns = [
-    { key: 'type', width: 22 },
-    { key: 'name', width: 45 },
-    { key: 'discount', width: 12 },
-    { key: 'qty', width: 15 },
-    { key: 'unitPrice', width: 18 },
-    { key: 'totalPrice', width: 15 },
-    { key: 'payment', width: 18 },
-    { key: 'grams', width: 15 },
-    { key: 'note', width: 30 }
-  ];
-
-  // UI Header Style Function
-  const styleHeader = (row, bgColor) => {
-    row.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgColor } };
-      cell.font = { color: { argb: 'FFFFFFFF' }, bold: true };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
-      cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-    });
-  };
-
-  // Border Function
-  const addBorder = (row) => {
-    row.eachCell((cell) => {
-      cell.border = { top: {style:'thin'}, left: {style:'thin'}, bottom: {style:'thin'}, right: {style:'thin'} };
-      cell.alignment = { vertical: 'middle', horizontal: 'left' };
-    });
-  };
-
-  // 1. MAIN SALES SECTION
-  const mainHeader = sheet.addRow(['Item Type', 'Item Name', 'Discount', 'Qty/Grams', 'Unit Price', 'Total Price', 'Payment Method', 'Total Grams', 'Note']);
-  styleHeader(mainHeader, 'FF2C3E50'); // Dark Blue Grey
-
-  mainRows.forEach(data => {
-    const row = sheet.addRow([data.type, data.name, data.discount, data.qty, data.unitPrice, data.totalPrice.toFixed(2), data.payment, data.grams, data.note]);
-    addBorder(row);
-  });
-
-  // 2. EXPENSES SECTION
-  sheet.addRow([]); // Blank Row
-  const expTitle = sheet.addRow(['EXPENSES']);
-  expTitle.font = { bold: true, size: 14, color: { argb: 'FFE74C3C' } }; // Red
-  
-  const expHeader = sheet.addRow(['Expense Category', 'Description', 'Amount', '', '', '', '', '', '']);
-  styleHeader(expHeader, 'FFC0392B'); // Dark Red
-
-  let totalExp = 0;
-  dailyExpenses.forEach(exp => {
-    let category = exp.name.toLowerCase().includes('taxi') ? "For Night Shift Staffs" : "Inventory"; 
-    const row = sheet.addRow([category, exp.name, exp.amount.toFixed(2), '', '', '', '', '', '']);
-    addBorder(row);
-    totalExp += exp.amount;
-  });
-
-  const expTotalRow = sheet.addRow(['', 'Total Expenses', totalExp.toFixed(2), '', '', '', '', '', '']);
-  expTotalRow.font = { bold: true, color: { argb: 'FFC0392B' } };
-  expTotalRow.getCell(3).border = { top: {style:'thick'}, bottom: {style:'thick'} };
-
-  // 3. FOODS & DRINKS SECTION
-  sheet.addRow([]); // Blank Row
-  const fbTitle = sheet.addRow(['FOODS & DRINKS']);
-  fbTitle.font = { bold: true, size: 14, color: { argb: 'FF2980B9' } }; // Blue
-  
-  const fbHeader = sheet.addRow(['Item Type', 'Item Name', 'Discount', 'Qty', 'Unit Price', 'Total Price', 'Payment Method', '', 'Note']);
-  styleHeader(fbHeader, 'FF2980B9');
-
-  fbRows.forEach(data => {
-    const row = sheet.addRow([data.type, data.name, data.discount, data.qty, data.unitPrice, data.totalPrice.toFixed(2), data.payment, '', data.note]);
-    addBorder(row);
-  });
-
-  // --- Generate & Download file ---
-  const buffer = await workbook.xlsx.writeBuffer();
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const reportDate = document.getElementById('reportDate')?.value || "Report";
-  saveAs(blob, `BestBuds_Report_${reportDate}.xlsx`);
 }
