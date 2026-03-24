@@ -385,11 +385,21 @@ async function addExpense(req, res, next) {
       ? `INSERT INTO daily_expenses (date, category, description, amount, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *`
       : `INSERT INTO daily_expenses (date, category, description, amount, created_at) VALUES (?, ?, ?, ?, NOW())`;
 
+    // Ensure daily_report exists for this date due to foreign key constraint
+    const existingReport = await query(`SELECT date FROM daily_reports WHERE date = ${placeholder(1)}`, [date]);
+    if (existingReport.length === 0) {
+      // Create a skeleton report if it doesn't exist
+      const insertSql = isPostgres 
+        ? `INSERT INTO daily_reports (date) VALUES ($1) ON CONFLICT (date) DO NOTHING`
+        : `INSERT IGNORE INTO daily_reports (date) VALUES (?)`;
+      await query(insertSql, [date]);
+    }
+
     const result = await query(sql, [date, category, description || '', expenseAmount]);
 
     res.status(201).json({
       success: true,
-      expense: isPostgres ? result[0] : result[0]
+      expense: result[0]
     });
   } catch (error) {
     return next(error);

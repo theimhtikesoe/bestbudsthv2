@@ -40,7 +40,10 @@ async function addExpenseToReport() {
       body: JSON.stringify({ date, category, description, amount })
     });
 
-    if (!response.ok) throw new Error('Failed to add expense');
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.message || 'Failed to add expense');
+    }
 
     showMessage('Expense added successfully', 'success');
     descriptionInput.value = '';
@@ -138,7 +141,10 @@ async function exportReportToExcel() {
 
   try {
     const response = await fetch(`/api/reports/${date}/export`);
-    if (!response.ok) throw new Error('Failed to export report');
+    if (!response.ok) {
+      const errData = await response.json().catch(() => ({}));
+      throw new Error(errData.message || 'Failed to export report');
+    }
 
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
@@ -222,36 +228,45 @@ function initializeEnhancements() {
   const reportSection = document.getElementById('reportSection');
   if (reportSection && !document.getElementById('expenseForm')) {
     const expenseHTML = `
-      <div id="expenseSection" class="card shadow-sm mt-4">
-        <div class="card-header bg-light">
-          <h5 class="mb-0">Daily Expenses</h5>
-        </div>
-        <div class="card-body">
+      <div id="expenseSection" class="mt-4">
+        <h2 class="h5 mb-3">Daily Expenses</h2>
+        <div class="detail-box p-3">
           <div class="row g-3 mb-3">
             <div class="col-md-3">
-              <label for="expenseCategory" class="form-label">Category</label>
-              <select id="expenseCategory" class="form-select">
+              <label for="expenseCategory" class="form-label small text-muted">Category</label>
+              <select id="expenseCategory" class="form-select form-select-sm">
                 <option value="">Select Category</option>
                 ${EXPENSE_CATEGORIES.map(cat => `<option value="${cat}">${cat}</option>`).join('')}
               </select>
             </div>
             <div class="col-md-4">
-              <label for="expenseDescription" class="form-label">Description</label>
-              <input id="expenseDescription" type="text" class="form-control" placeholder="Optional" />
+              <label for="expenseDescription" class="form-label small text-muted">Description</label>
+              <input id="expenseDescription" type="text" class="form-control form-control-sm" placeholder="Optional" />
             </div>
             <div class="col-md-2">
-              <label for="expenseAmount" class="form-label">Amount (THB)</label>
-              <input id="expenseAmount" type="number" min="0" step="0.01" class="form-control" />
+              <label for="expenseAmount" class="form-label small text-muted">Amount (THB)</label>
+              <input id="expenseAmount" type="number" min="0" step="0.01" class="form-control form-control-sm" />
             </div>
             <div class="col-md-3 d-flex align-items-end">
-              <button onclick="addExpenseToReport()" class="btn btn-success w-100">Add Expense</button>
+              <button onclick="addExpenseToReport()" class="btn btn-sm btn-success w-100 fw-bold">Add Expense</button>
             </div>
           </div>
           <div id="expensesList" class="mt-3"></div>
         </div>
       </div>
     `;
-    reportSection.insertAdjacentHTML('afterend', expenseHTML);
+    // Find the Net Sale row and insert after it
+    const netSaleInput = document.getElementById('netSale');
+    if (netSaleInput) {
+      const row = netSaleInput.closest('.row');
+      if (row) {
+        row.insertAdjacentHTML('afterend', expenseHTML);
+      } else {
+        reportSection.insertAdjacentHTML('afterend', expenseHTML);
+      }
+    } else {
+      reportSection.insertAdjacentHTML('afterend', expenseHTML);
+    }
   }
 
   // Create classification stats section if it doesn't exist
