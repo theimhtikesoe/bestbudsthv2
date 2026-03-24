@@ -294,13 +294,23 @@ function processOrdersData(data) {
       let isAcc = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch']
                   .some(keyword => itemName.includes(keyword) || category.includes(keyword));
       
-      // Special case: Grape Soda is Main/Flower, NOT F&B (exclude from F&B check)
-      let isGrapeSoda = itemName.includes('grape soda');
+      // Flower Strains List (Main/Flower items)
+      const flowerStrains = [
+        'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
+        'moonbow', 'emergen c', 'tea time', 'silver shadow', 
+        'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez',
+        'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
+        'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
+        'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz'
+      ];
+
+      // Special case: Item is a Flower/Main strain
+      let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       
-      let isFB = !isGrapeSoda && (['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake']
+      let isFB = !isFlowerStrain && (['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake']
                  .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || 
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')) ||
-                 (grossPrice / (qty || 1)) <= 50) && !itemName.includes('rozay cake');
+                 (grossPrice / (qty || 1)) <= 50);
 
       // Gram Exclusion Logic
       // 100% Discounted items (itemNetPrice === 0) are strictly excluded from grams

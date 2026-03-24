@@ -290,13 +290,23 @@ async function exportReportToExcel() {
 
           let isAcc = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch']
                       .some(keyword => itemName.includes(keyword) || category.includes(keyword));
-          let isGrapeSoda = itemName.includes('grape soda');
+          
+          const flowerStrains = [
+            'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
+            'moonbow', 'emergen c', 'tea time', 'silver shadow', 
+            'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez',
+            'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
+            'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
+            'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz'
+          ];
+
+          let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+          
           let fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake'];
           let hasFBKeyword = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
                              (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
 
-          let isFB = !isGrapeSoda && !itemName.includes('rozay cake') && 
-                     (hasFBKeyword || ((grossPrice / (qty || 1)) <= 50 && !isAcc && !itemName.includes('free')));
+          let isFB = !isFlowerStrain && (hasFBKeyword || (grossPrice / (qty || 1)) <= 50);
 
           const exportItem = {
             name: item.name || item.item_name,

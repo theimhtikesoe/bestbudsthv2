@@ -420,7 +420,18 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
                 itemName.includes('lighter') ||
                 itemName.includes('the lobby') ||
                 itemName.includes('merch');
-    let isFB = (normalizedCategory.includes('soft drink') || 
+    const flowerStrains = [
+      'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
+      'moonbow', 'emergen c', 'tea time', 'silver shadow', 
+      'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez',
+      'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
+      'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
+      'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz'
+    ];
+
+    let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+
+    let isFB = !isFlowerStrain && (normalizedCategory.includes('soft drink') || 
                 normalizedCategory.includes('snacks') || 
                 normalizedCategory.includes('beverage') ||
                 normalizedCategory.includes('drink') ||
@@ -443,13 +454,13 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
                 itemName.includes('juice') ||
                 itemName.includes('cookie') ||
                 itemName.includes('brownie') ||
-                itemName.includes('cake')) && !itemName.includes('rozay cake');
+                itemName.includes('cake'));
 
     // --- [3] THE BEST BUDS ROUTING LOGIC ---
     // Note: In backend, we need to determine unit price for the <= 50 check
     const unitPrice = qty > 0 ? roundCurrency(itemTotal / qty) : itemTotal;
 
-    if (unitPrice <= 50 || isFB) {
+    if ((unitPrice <= 50 || isFB) && !isFlowerStrain) {
       // Group B: F&B (ဒါမှမဟုတ် 50 THB အောက် Item တွေ)
       // Action -> ညာဘက်မှာထားမယ်, Gram 0.000
       denominatorPrice += itemTotal;
