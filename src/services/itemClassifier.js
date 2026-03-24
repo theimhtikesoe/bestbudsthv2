@@ -5,8 +5,9 @@
  */
 
 // Special case mappings for items that should be classified regardless of price
+// NOTE: Grape Soda is explicitly classified as 'main' (Flower) even though it may have low price
 const SPECIAL_CASE_MAPPINGS = {
-  'grape soda': 'main',
+  'grape soda': 'main',      // Flower/Main category
   'emergen c': 'main',
   'moonbow': 'main',
   'crystal candy': 'main',
@@ -37,14 +38,15 @@ function classifyItem(itemName, unitPrice) {
   
   const normalizedName = itemName.toLowerCase().trim();
   
-  // Check special case mappings first
+  // Check special case mappings first (highest priority)
+  // This ensures items like "Grape Soda" are always classified as 'main' regardless of price
   for (const [key, category] of Object.entries(SPECIAL_CASE_MAPPINGS)) {
     if (normalizedName.includes(key)) {
       return category;
     }
   }
   
-  // Apply unit price threshold
+  // Apply unit price threshold only if no special case mapping found
   const price = parseFloat(unitPrice) || 0;
   return price > UNIT_PRICE_THRESHOLD ? 'main' : 'fb';
 }
