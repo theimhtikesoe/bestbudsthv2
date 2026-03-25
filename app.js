@@ -81,7 +81,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const percentage = parseFloat(entry.percentage || 0);
         li.textContent = `${percentage.toFixed(0)}%`;
       } else {
-        li.textContent = `THB ${amount.toFixed(2)}`;
+        const mainTotal = parseFloat(entry.main_acc_total || 0);
+        const fbTotal = parseFloat(entry.fb_total || 0);
+        
+        if (mainTotal > 0 && fbTotal > 0) {
+          li.textContent = `THB ${mainTotal.toFixed(2)} / ${fbTotal.toFixed(2)}`;
+        } else if (fbTotal > 0) {
+          li.textContent = `F&B THB ${fbTotal.toFixed(2)}`;
+        } else {
+          li.textContent = `THB ${mainTotal.toFixed(2)}`;
+        }
       }
       
       listEl.appendChild(li);
