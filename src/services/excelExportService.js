@@ -14,7 +14,6 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
 
   // --- STYLING ---
   const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8ECDA' } };
-  const sectionFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCCCCCC' } };
   const border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
   const fontBold = { bold: true };
   const centerAlign = { vertical: 'middle', horizontal: 'center' };
@@ -40,7 +39,18 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
     cell.alignment = centerAlign;
   });
 
-  // --- PROCESS RECEIPTS FOR FLOWER/ACCESSORIES SECTION ---
+  const flowerStrains = [
+    'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
+    'moonbow', 'emergen c', 'tea time', 'silver shadow', 
+    'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez',
+    'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
+    'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
+    'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
+    'free pina colada', 'thc gummy'
+  ];
+
+  const fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake'];
+
   const flowerItems = [];
   const fbItems = [];
   let totalFlowerGrams = 0;
@@ -48,58 +58,82 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
   receipts.forEach(receipt => {
     const lineItems = receipt.line_items || receipt.items || [];
     const paymentType = (receipt.payments && receipt.payments[0]) 
-      ? (receipt.payments[0].payment_type || 'Other') 
+      ? (receipt.payments[0].payment_type || receipt.payments[0].name || 'Other') 
       : 'Other';
+    const receiptNumber = receipt.receipt_number || receipt.number || 'N/A';
 
-    // Group items by receipt for the "Item Name" slash format
     const receiptFlowerItems = [];
-    const receiptFbItems = [];
 
     lineItems.forEach(item => {
+      const itemName = (item.item_name || item.name || 'Unknown').toLowerCase();
       const category = (item.category_name || '').toLowerCase();
-      const isFb = category.includes('food') || category.includes('drink') || category.includes('fb');
-      
+      const qty = parseFloat(item.quantity || 0);
+      const netPrice = parseFloat(item.total_money?.amount ?? item.total_money ?? 0);
+      const grossPrice = parseFloat(item.gross_total_money?.amount ?? item.gross_total_money ?? netPrice);
+      const unitPrice = qty > 0 ? netPrice / qty : netPrice;
+
+      // Filter out zero-price/100% discount items
+      if (netPrice <= 0) return;
+
+      const isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+      const isThcGummy = itemName.includes('thc gummy');
+      const isFB = !isFlowerStrain && (
+        fbKeywords.some(k => itemName.includes(k) || category.includes(k)) ||
+        (['tea'].some(k => itemName.includes(k) || category.includes(k)) && !itemName.includes('tea time')) ||
+        unitPrice <= 50
+      );
+
       const itemInfo = {
-        name: item.item_name || item.name || 'Unknown',
-        qty: parseFloat(item.quantity || 0),
-        price: parseFloat(item.price?.amount || item.unit_price || item.price || 0),
-        total: parseFloat(item.total_money?.amount || item.total_price || 0),
-        discount: parseFloat(item.discount_money?.amount || 0),
+        name: item.item_name || item.name,
+        qty: qty,
+        unitPrice: unitPrice,
+        totalPrice: netPrice,
+        discount: (grossPrice > netPrice) ? `${Math.round(((grossPrice - netPrice) / grossPrice) * 100)}%` : '',
         payment: paymentType,
-        category: category
+        note: receiptNumber
       };
 
-      if (isFb) {
-        receiptFbItems.push(itemInfo);
+      if (isFB) {
+        fbItems.push(itemInfo);
       } else {
         receiptFlowerItems.push(itemInfo);
+        // Gram calculation logic
+        const isFree = netPrice <= 0 || itemName.includes('free');
+        const isLobbyShirt = itemName.includes('the lobby shirt');
+        if (!isFree && !isLobbyShirt && !isThcGummy) {
+          totalFlowerGrams += qty;
+        }
       }
     });
 
     if (receiptFlowerItems.length > 0) {
       const names = receiptFlowerItems.map(i => i.name).join(' / ');
-      const qtys = receiptFlowerItems.map(i => i.qty).join(' / ');
-      const prices = receiptFlowerItems.map(i => i.price).join(' / ');
-      const total = receiptFlowerItems.reduce((sum, i) => sum + i.total, 0);
-      const grams = receiptFlowerItems.reduce((sum, i) => sum + i.qty, 0);
-      totalFlowerGrams += grams;
+      const qtys = receiptFlowerItems.map(i => {
+        const isThcGummy = (i.name || '').toLowerCase().includes('thc gummy');
+        return isThcGummy ? i.qty : '-';
+      }).join(' / ');
+      const prices = receiptFlowerItems.map(i => i.unitPrice.toFixed(2)).join(' / ');
+      const total = receiptFlowerItems.reduce((sum, i) => sum + i.totalPrice, 0);
+      const grams = receiptFlowerItems.reduce((sum, i) => {
+        const itemName = (i.name || '').toLowerCase();
+        const isThcGummy = itemName.includes('thc gummy');
+        const isFree = i.totalPrice <= 0 || itemName.includes('free');
+        const isLobbyShirt = itemName.includes('the lobby shirt');
+        return (!isFree && !isLobbyShirt && !isThcGummy) ? sum + i.qty : sum;
+      }, 0);
 
       flowerItems.push({
         type: 'Flower / Accessories',
         name: names,
-        discount: '',
+        discount: receiptFlowerItems.map(i => i.discount).filter(Boolean).join(' / '),
         qty: qtys,
         unitPrice: prices,
         totalPrice: total,
         payment: paymentType,
-        totalGrams: grams + 'g',
-        note: ''
+        totalGrams: grams > 0 ? grams.toFixed(3) + ' G' : '-',
+        note: receiptNumber
       });
     }
-
-    receiptFbItems.forEach(item => {
-      fbItems.push(item);
-    });
   });
 
   // Add Flower rows
@@ -141,8 +175,8 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
 
   let totalFbPrice = 0;
   fbItems.forEach(item => {
-    totalFbPrice += item.total;
-    const row = sheet.addRow(['', item.name, item.discount || '', item.qty, item.price, item.total, item.payment]);
+    totalFbPrice += item.totalPrice;
+    const row = sheet.addRow(['', item.name, item.discount || '', item.qty, item.unitPrice, item.totalPrice, item.payment]);
     row.eachCell(cell => cell.border = border);
   });
 
@@ -156,20 +190,21 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
   const dashHeader = sheet.addRow(['Dashboard (Daily Summary)']);
   dashHeader.getCell(1).font = fontBold;
 
-  const dashSubHeader = sheet.addRow(['Flower Sales(grams)', 'Cash In', 'Card In', 'Transfer In', 'Net Sales']);
+  const dashSubHeader = sheet.addRow(['Flower Sales(grams)', 'Cash In', 'Card In', 'Transfer In', 'F&B Total Price', 'Net Sales']);
   dashSubHeader.eachCell(cell => { cell.font = fontBold; cell.border = border; });
 
   const dashRow = sheet.addRow([
-    totalFlowerGrams + 'g',
+    totalFlowerGrams.toFixed(3) + ' G',
     reportData.cash_total || 0,
     reportData.card_total || 0,
     reportData.transfer_total || 0,
+    totalFbPrice,
     reportData.net_sale || 0
   ]);
   dashRow.eachCell(cell => cell.border = border);
 
   sheet.addRow([]);
-  sheet.addRow(['Staffs', 'Lont x Noom']); // Placeholder staff
+  sheet.addRow(['Staffs', reportData.closing_staff || 'Lont x Noom']);
 
   return await workbook.xlsx.writeBuffer();
 }

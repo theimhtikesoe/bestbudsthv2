@@ -210,8 +210,12 @@ function renderEntryList(listElement, entries, options = {}) {
         content = percentageOnly ? `${percentageFallbackText}` : `${formatCurrency(entry.amount)}`;
       }
     } else {
-      if (entry.mainAccTotal > 0 || entry.fbTotal > 0) {
+      if (entry.mainAccTotal > 0 && entry.fbTotal > 0) {
         content = `THB ${entry.mainAccTotal.toFixed(2)} / ${entry.fbTotal.toFixed(2)}`;
+      } else if (entry.fbTotal > 0 && entry.mainAccTotal <= 0) {
+        content = `F&B ${formatCurrency(entry.fbTotal)}`;
+      } else if (entry.mainAccTotal > 0 && entry.fbTotal <= 0) {
+        content = `${formatCurrency(entry.mainAccTotal)}`;
       } else {
         content = `${formatCurrency(entry.amount)}`;
       }
