@@ -1,3 +1,14 @@
+function showMessage(text, type = 'success') {
+  const messageEl = document.getElementById('message');
+  if (!messageEl) return;
+  messageEl.textContent = text;
+  messageEl.className = `alert alert-${type}`;
+  messageEl.classList.remove('d-none');
+  setTimeout(() => messageEl.classList.add('d-none'), 5000);
+}
+
+window.showMessage = showMessage;
+
 document.addEventListener('DOMContentLoaded', () => {
   const els = {
     reportDate: document.getElementById('reportDate'),
@@ -42,13 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 500);
   }
 
-  function showMessage(text, type = 'success') {
-    if (!els.message) return;
-    els.message.textContent = text;
-    els.message.className = `alert alert-${type}`;
-    els.message.classList.remove('d-none');
-    setTimeout(() => els.message.classList.add('d-none'), 5000);
-  }
+
 
   function renderEntries(listEl, totalEl, entries, type = 'THB', isDiscount = false) {
     if (!listEl || !totalEl) return;
