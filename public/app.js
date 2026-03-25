@@ -120,8 +120,24 @@ function normalizeEntries(entries) {
       percentage = parsePercentage(entry.percentage ?? entry.percent ?? entry.rate);
       time = entry.time || null;
       receiptNumber = entry.receiptNumber || entry.receipt_number || entry.number || null;
-      mainAccTotal = entry.main_acc_total || 0;
-      fbTotal = entry.fb_total || 0;
+      // Ensure mainAccTotal and fbTotal reflect discounted prices
+      // If main_acc_total or fb_total are not explicitly provided as discounted, derive them from the overall discounted 'amount'
+      mainAccTotal = entry.main_acc_total || (entry.amount - (entry.fb_total || 0));
+      fbTotal = entry.fb_total || (entry.amount - (entry.main_acc_total || 0));
+      
+      // Fallback if still zero or negative after derivation, use the amount directly
+      if (mainAccTotal <= 0 && fbTotal <= 0) {
+        mainAccTotal = amount; // Assume all is main/acc if no breakdown
+        fbTotal = 0;
+      } else if (mainAccTotal <= 0 && fbTotal > 0) {
+        mainAccTotal = amount - fbTotal;
+      } else if (fbTotal <= 0 && mainAccTotal > 0) {
+        fbTotal = amount - mainAccTotal;
+      }
+      
+      // Ensure they are not negative
+      mainAccTotal = Math.max(0, mainAccTotal);
+      fbTotal = Math.max(0, fbTotal);
     } else {
       amount = entry;
       mainAccTotal = amount; 
