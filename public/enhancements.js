@@ -1,6 +1,7 @@
 /**
  * Enhanced Daily Reports - Item Classification & Expense Tracking
  * Performs full client-side Excel export using ExcelJS
+ * Matches User Template: BestBuds_Report_2026-03-187.xlsx
  */
 
 let currentEditingExpenseId = null;
@@ -63,7 +64,6 @@ async function addExpenseToReport() {
     let expenses = getLocalExpenses(date);
 
     if (currentEditingExpenseId) {
-      // Update existing
       expenses = expenses.map(exp => {
         if (exp.id === currentEditingExpenseId) {
           return { ...exp, category, description, amount };
@@ -74,7 +74,6 @@ async function addExpenseToReport() {
       currentEditingExpenseId = null;
       if (submitBtn) submitBtn.textContent = 'Add Expense';
     } else {
-      // Add new
       const newExpense = {
         id: Date.now(),
         date,
@@ -88,42 +87,28 @@ async function addExpenseToReport() {
     }
     
     saveLocalExpenses(date, expenses);
-
-    // Clear form
     categorySelect.value = '';
     descriptionInput.value = '';
     amountInput.value = '';
-    
     renderExpensesList(expenses, date);
   } catch (error) {
     showMessage(`Error: ${error.message}`, 'danger');
   }
 }
 
-/**
- * Edit an expense (Load into form)
- */
 function editExpense(id, date) {
   const expenses = getLocalExpenses(date);
   const expense = expenses.find(e => e.id === id);
-  
   if (!expense) return;
-
   document.getElementById('expenseCategory').value = expense.category;
   document.getElementById('expenseDescription').value = expense.description || '';
   document.getElementById('expenseAmount').value = expense.amount;
-  
   currentEditingExpenseId = id;
   const submitBtn = document.querySelector('#expenseSection button');
   if (submitBtn) submitBtn.textContent = 'Update Expense';
-  
-  // Scroll to form
   document.getElementById('expenseSection').scrollIntoView({ behavior: 'smooth' });
 }
 
-/**
- * Cancel editing
- */
 function cancelEdit() {
   currentEditingExpenseId = null;
   document.getElementById('expenseCategory').value = '';
@@ -133,107 +118,52 @@ function cancelEdit() {
   if (submitBtn) submitBtn.textContent = 'Add Expense';
 }
 
-/**
- * Load report data for a specific date (Staff + Expenses)
- */
 async function loadReportData(date) {
   const expenses = getLocalExpenses(date);
   renderExpensesList(expenses, date);
-  
   const staffName = getClosingStaff(date);
   const staffInput = document.getElementById('closingStaff');
   if (staffInput) staffInput.value = staffName;
 }
 
-/**
- * Alias for exportReportToExcel to match HTML onclick
- */
 function exportToExcel() {
   return exportReportToExcel();
 }
 
-/**
- * Render expenses list in the UI
- */
 function renderExpensesList(expenses, date) {
   const container = document.getElementById('expensesList');
   if (!container) return;
-
   if (expenses.length === 0) {
     container.innerHTML = '<p class="text-muted">No expenses recorded</p>';
     return;
   }
-
-  let html = `
-    <div class="table-responsive">
-      <table class="table table-sm table-hover align-middle">
-        <thead class="table-dark">
-          <tr>
-            <th>Category</th>
-            <th>Description</th>
-            <th>Amount</th>
-            <th class="text-end">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
-
+  let html = `<div class="table-responsive"><table class="table table-sm table-hover align-middle"><thead class="table-dark"><tr><th>Category</th><th>Description</th><th>Amount</th><th class="text-end">Actions</th></tr></thead><tbody>`;
   let total = 0;
   expenses.forEach(expense => {
     const amount = parseFloat(expense.amount) || 0;
     total += amount;
-    html += `
-      <tr>
-        <td><span class="badge bg-secondary">${expense.category}</span></td>
-        <td>${expense.description || '-'}</td>
-        <td class="fw-bold">${amount.toLocaleString()} THB</td>
-        <td class="text-end">
-          <button class="btn btn-xs btn-outline-info me-1" onclick="editExpense(${expense.id}, '${date}')">Edit</button>
-          <button class="btn btn-xs btn-outline-danger" onclick="deleteExpense(${expense.id}, '${date}')">Delete</button>
-        </td>
-      </tr>
-    `;
+    html += `<tr><td><span class="badge bg-secondary">${expense.category}</span></td><td>${expense.description || '-'}</td><td class="fw-bold">${amount.toLocaleString()} THB</td><td class="text-end"><button class="btn btn-xs btn-outline-info me-1" onclick="editExpense(${expense.id}, '${date}')">Edit</button><button class="btn btn-xs btn-outline-danger" onclick="deleteExpense(${expense.id}, '${date}')">Delete</button></td></tr>`;
   });
-
-  html += `
-        </tbody>
-        <tfoot class="table-light">
-          <tr class="fw-bold">
-            <td colspan="2">Total Expenses</td>
-            <td colspan="2" class="text-primary">${total.toLocaleString()} THB</td>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  `;
-
+  html += `</tbody><tfoot class="table-light"><tr class="fw-bold"><td colspan="2">Total Expenses</td><td colspan="2" class="text-primary">${total.toLocaleString()} THB</td></tr></tfoot></table></div>`;
   container.innerHTML = html;
 }
 
-/**
- * Delete expense (LocalStorage Version)
- */
 async function deleteExpense(id, date) {
   if (!confirm('Are you sure you want to delete this expense?')) return;
-
   try {
     let expenses = getLocalExpenses(date);
     expenses = expenses.filter(e => e.id !== id);
     saveLocalExpenses(date, expenses);
-
     showMessage('Expense deleted', 'success');
     renderExpensesList(expenses, date);
-    
-    if (currentEditingExpenseId === id) {
-      cancelEdit();
-    }
+    if (currentEditingExpenseId === id) cancelEdit();
   } catch (error) {
     showMessage(`Error: ${error.message}`, 'danger');
   }
 }
 
 /**
- * Full Client-Side Excel Export using ExcelJS
+ * Full Client-Side Excel Export - Template Matching Version
  */
 async function exportReportToExcel() {
   const dateInput = document.getElementById('reportDate');
@@ -246,13 +176,10 @@ async function exportReportToExcel() {
     return;
   }
 
-  // Save current staff name before exporting
   saveClosingStaff(date, staffName);
 
   try {
     showMessage('Generating Excel file...', 'info');
-
-    // 1. Gather Data from UI and Global Variables
     const rawData = window.lastSyncedData;
     const expenses = getLocalExpenses(date);
 
@@ -265,11 +192,11 @@ async function exportReportToExcel() {
     const cashTotal = Number(rawData.cash_total || 0);
     const cardTotal = Number(rawData.card_total || 0);
     const transferTotal = Number(rawData.transfer_total || 0);
-    const totalGrams = Number(rawData.total_gram_qty || 0);
     const netSale = Number(rawData.net_sale || 0);
 
     const flowerItems = [];
     const fbItems = [];
+    let totalFlowerGrams = 0;
 
     if (Array.isArray(receipts)) {
       receipts.forEach(receipt => {
@@ -289,24 +216,20 @@ async function exportReportToExcel() {
           
           let grossPrice = Number(item.gross_total_money?.amount ?? item.total_money?.amount ?? 0);
           const lineItemDiscount = parseFloat(item.total_discount_money?.amount || item.discount_money?.amount || item.discount_amount || 0);
-          
-          // Final net for this line item (before order-level discount)
           let itemNetPrice = item.total_money?.amount !== undefined ? parseFloat(item.total_money.amount) : (grossPrice - lineItemDiscount);
           
-          // Apply order-level discount prorated
-          let allocatedOrderDiscount = 0;
           if (hasOrderDiscount && orderTotal > 0 && itemNetPrice > 0) {
-            allocatedOrderDiscount = (itemNetPrice / (orderTotal + orderDiscount)) * orderDiscount;
+            let allocatedOrderDiscount = (itemNetPrice / (orderTotal + orderDiscount)) * orderDiscount;
             itemNetPrice = Math.max(0, itemNetPrice - allocatedOrderDiscount);
           }
 
-          const totalItemDiscount = lineItemDiscount + allocatedOrderDiscount;
-          const discountPercent = grossPrice > 0 ? (totalItemDiscount / grossPrice * 100) : 0;
-          const discountStr = totalItemDiscount > 0 ? `${discountPercent.toFixed(0)}% (${totalItemDiscount.toFixed(2)} THB)` : '-';
+          // Rule: Skip Price 0 items entirely
+          if (itemNetPrice <= 0.01) return;
 
-          let isAcc = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch']
-                      .some(keyword => itemName.includes(keyword) || category.includes(keyword));
-          
+          const totalItemDiscount = grossPrice - itemNetPrice;
+          const discountPercent = grossPrice > 0 ? (totalItemDiscount / grossPrice * 100) : 0;
+          const discountStr = totalItemDiscount > 0.01 ? `${discountPercent.toFixed(0)}% (${totalItemDiscount.toFixed(2)} THB)` : '-';
+
           const flowerStrains = [
             'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
             'moonbow', 'emergen c', 'tea time', 'silver shadow', 
@@ -314,178 +237,141 @@ async function exportReportToExcel() {
             'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
             'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
             'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-            'free pina colada',
-            'thc gummy'
+            'free pina colada', 'thc gummy'
           ];
 
           let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
           let isThcGummy = itemName.includes('thc gummy');
-          
+          let isLobbyShirt = itemName.includes('the lobby shirt');
+
           let fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju'];
           let hasFBKeyword = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
                              (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
 
           let isFB = !isFlowerStrain && (hasFBKeyword || (grossPrice / (qty || 1)) <= 50);
 
-          // Only add items with net price > 0.01 to the export list (filter out free items)
-          if (itemNetPrice > 0.01) {
-            // Gram Logic: THC Gummy is a flower strain but we don't show grams for it as requested
-            const showAsGram = isFlowerStrain && !isThcGummy;
-            
-            const exportItem = {
-              name: item.name || item.item_name,
-              qty: showAsGram ? '-' : qty,
-              gram: showAsGram ? `${qty.toFixed(3)} G` : '-',
-              unitPrice: grossPrice / (qty || 1),
-              totalPrice: itemNetPrice,
-              discount: discountStr,
-              payment: paymentMethod,
-              note: receiptNumber
-            };
+          const exportItem = {
+            type: isFB ? 'F&B' : 'Flower/Main',
+            name: item.name || item.item_name,
+            qty: qty,
+            unitPrice: grossPrice / (qty || 1),
+            discount: discountStr,
+            netPrice: itemNetPrice,
+            payment: paymentMethod,
+            note: receiptNumber
+          };
 
-            if (isFB) fbItems.push(exportItem);
-            else flowerItems.push(exportItem);
+          if (isFB) {
+            fbItems.push(exportItem);
+          } else {
+            flowerItems.push(exportItem);
+            // Gram Calculation: Exclude THC Gummy and Lobby Shirt
+            if (!isThcGummy && !isLobbyShirt) {
+              totalFlowerGrams += qty;
+            }
           }
         });
       });
     }
 
-    // 2. Create Workbook
+    // 2. Create Workbook Matching Template
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet('Daily Report');
 
-    const setHeaderStyle = (cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD3D3D3' } };
-      cell.font = { bold: true };
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    };
+    // Styling
+    const border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    const boldFont = { bold: true };
+    const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD3D3D3' } };
 
-    const setBorder = (cell) => {
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
-    };
+    // Row 1: Title
+    sheet.getCell('A1').value = `Daily Report - ${date}`;
+    sheet.getCell('A1').font = { size: 14, bold: true };
 
-    // Set Header
-    sheet.getCell('A1').value = `Daily Report: ${date}`;
-    sheet.getCell('A1').font = { size: 16, bold: true };
-    sheet.getCell('A2').value = `Staff: ${staffName}`;
-    sheet.mergeCells('A1:I1');
-    sheet.mergeCells('A2:I2');
+    // Row 3: Section Title
+    sheet.getCell('A3').value = 'Flower / Main / Accessories';
+    sheet.getCell('A3').font = boldFont;
 
-    let currRow = 4;
-
-    // --- SECTION 1: FLOWERS & ACCESSORIES ---
-    const flowerHeaders = ['Type', 'Item Name', 'Discount', 'Qty', 'Gram', 'Unit Price', 'Total Price', 'Payment', 'Note'];
-    flowerHeaders.forEach((h, i) => {
-      const cell = sheet.getCell(`${String.fromCharCode(65 + i)}${currRow}`);
+    // Row 4: Headers
+    const headers = ['Item Type', 'Item Name', 'Qty', 'Unit Price', 'Discount', 'Net Price', 'Payment', 'Note'];
+    headers.forEach((h, i) => {
+      const cell = sheet.getCell(4, i + 1);
       cell.value = h;
-      setHeaderStyle(cell);
+      cell.font = boldFont;
+      cell.fill = headerFill;
+      cell.border = border;
     });
-    currRow++;
 
+    let currRow = 5;
     flowerItems.forEach(item => {
-      sheet.getCell(`A${currRow}`).value = 'Flower / Acc';
-      sheet.getCell(`B${currRow}`).value = item.name;
-      sheet.getCell(`C${currRow}`).value = item.discount;
-      sheet.getCell(`D${currRow}`).value = item.qty;
-      sheet.getCell(`E${currRow}`).value = item.gram;
-      sheet.getCell(`F${currRow}`).value = item.unitPrice;
-      sheet.getCell(`G${currRow}`).value = item.totalPrice;
-      sheet.getCell(`H${currRow}`).value = item.payment;
-      sheet.getCell(`I${currRow}`).value = item.note;
-      ['A','B','C','D','E','F','G','H','I'].forEach(col => setBorder(sheet.getCell(`${col}${currRow}`)));
+      const row = sheet.getRow(currRow);
+      row.values = [item.type, item.name, item.qty, item.unitPrice, item.discount, item.netPrice, item.payment, item.note];
+      row.eachCell(cell => cell.border = border);
       currRow++;
     });
-    currRow += 2;
 
-    // --- SECTION 2: EXPENSES ---
+    currRow += 2;
+    // Expenses Section
     sheet.getCell(`A${currRow}`).value = 'Expenses';
-    sheet.getCell(`A${currRow}`).font = { bold: true, size: 12 };
+    sheet.getCell(`A${currRow}`).font = boldFont;
     currRow++;
-    
     const expHeaders = ['Category', 'Description', 'Amount'];
     expHeaders.forEach((h, i) => {
-      const cell = sheet.getCell(`${String.fromCharCode(65 + i)}${currRow}`);
+      const cell = sheet.getCell(currRow, i + 1);
       cell.value = h;
-      setHeaderStyle(cell);
+      cell.font = boldFont;
+      cell.border = border;
     });
     currRow++;
-
     let totalExp = 0;
     expenses.forEach(exp => {
       totalExp += exp.amount;
-      sheet.getCell(`A${currRow}`).value = exp.category;
-      sheet.getCell(`B${currRow}`).value = exp.description;
-      sheet.getCell(`C${currRow}`).value = exp.amount;
-      ['A','B','C'].forEach(col => setBorder(sheet.getCell(`${col}${currRow}`)));
+      const row = sheet.getRow(currRow);
+      row.values = [exp.category, exp.description || '-', exp.amount];
+      row.eachCell(cell => cell.border = border);
       currRow++;
     });
-
-    sheet.getCell(`B${currRow}`).value = 'Total Expenses';
-    sheet.getCell(`C${currRow}`).value = totalExp;
-    sheet.getCell(`C${currRow}`).font = { bold: true };
     currRow += 2;
 
-    // --- SECTION 3: FOOD & DRINKS ---
+    // F&B Section
     sheet.getCell(`A${currRow}`).value = 'Food & Drinks';
-    sheet.getCell(`A${currRow}`).font = { bold: true, size: 12 };
+    sheet.getCell(`A${currRow}`).font = boldFont;
     currRow++;
-
-    const fbHeaders = ['Type', 'Item Name', 'Discount', 'Qty', 'Gram', 'Unit Price', 'Total Price', 'Payment', 'Note'];
-    fbHeaders.forEach((h, i) => {
-      const cell = sheet.getCell(`${String.fromCharCode(65 + i)}${currRow}`);
+    headers.forEach((h, i) => {
+      const cell = sheet.getCell(currRow, i + 1);
       cell.value = h;
-      setHeaderStyle(cell);
+      cell.font = boldFont;
+      cell.fill = headerFill;
+      cell.border = border;
     });
     currRow++;
-
     fbItems.forEach(item => {
-      sheet.getCell(`A${currRow}`).value = 'F&B';
-      sheet.getCell(`B${currRow}`).value = item.name;
-      sheet.getCell(`C${currRow}`).value = item.discount;
-      sheet.getCell(`D${currRow}`).value = item.qty;
-      sheet.getCell(`E${currRow}`).value = item.gram;
-      sheet.getCell(`F${currRow}`).value = item.unitPrice;
-      sheet.getCell(`G${currRow}`).value = item.totalPrice;
-      sheet.getCell(`H${currRow}`).value = item.payment;
-      sheet.getCell(`I${currRow}`).value = item.note;
-      ['A','B','C','D','E','F','G','H','I'].forEach(col => setBorder(sheet.getCell(`${col}${currRow}`)));
+      const row = sheet.getRow(currRow);
+      row.values = [item.type, item.name, item.qty, item.unitPrice, item.discount, item.netPrice, item.payment, item.note];
+      row.eachCell(cell => cell.border = border);
       currRow++;
     });
     currRow += 2;
 
-    // --- SECTION 4: DAILY SUMMARY DASHBOARD ---
+    // Dashboard Section
     sheet.getCell(`A${currRow}`).value = 'Daily Summary Dashboard';
-    sheet.getCell(`A${currRow}`).font = { bold: true, size: 12 };
+    sheet.getCell(`A${currRow}`).font = boldFont;
     currRow++;
 
-    const fbTotal = fbItems.reduce((acc, item) => acc + item.totalPrice, 0);
-    const summaryData = [
-      ['Total Grams Sold', totalGrams, 'G'],
+    const dashboard = [
+      ['Total Grams Sold', totalFlowerGrams, 'G'],
       ['Cash In', cashTotal, 'THB'],
       ['Card In', cardTotal, 'THB'],
       ['Transfer In', transferTotal, 'THB'],
-      ['F&B Total Price', fbTotal, 'THB'],
       ['Total Expenses', totalExp, 'THB'],
       ['Net Sales (Total)', netSale, 'THB'],
       ['Net Profit (After Expenses)', netSale - totalExp, 'THB']
     ];
 
-    summaryData.forEach(row => {
-      sheet.getCell(`A${currRow}`).value = row[0];
-      sheet.getCell(`B${currRow}`).value = row[1];
-      sheet.getCell(`C${currRow}`).value = row[2];
-      ['A','B','C'].forEach(col => setBorder(sheet.getCell(`${col}${currRow}`)));
+    dashboard.forEach(d => {
+      sheet.getCell(`A${currRow}`).value = d[0];
+      sheet.getCell(`B${currRow}`).value = d[1];
+      sheet.getCell(`C${currRow}`).value = d[2];
+      ['A','B','C'].forEach(col => sheet.getCell(`${col}${currRow}`).border = border);
       currRow++;
     });
 
@@ -495,7 +381,7 @@ async function exportReportToExcel() {
     const url = window.URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `Daily_Report_${date}.xlsx`;
+    anchor.download = `BestBuds_Report_${date}.xlsx`;
     anchor.click();
     window.URL.revokeObjectURL(url);
 
