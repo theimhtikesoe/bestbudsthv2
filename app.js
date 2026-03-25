@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     syncButton: document.getElementById('syncButton'),
     saveButton: document.getElementById('saveButton'),
     printButton: document.getElementById('printButton'),
+    exportButton: document.getElementById('exportCsvBtn'),
     cashTotal: document.getElementById('cashTotal'),
     cardTotal: document.getElementById('cardTotal'),
     transferTotal: document.getElementById('transferTotal'),
@@ -133,6 +134,19 @@ document.addEventListener('DOMContentLoaded', () => {
   if (els.syncButton) els.syncButton.addEventListener('click', syncFromLoyverse);
   if (els.saveButton) els.saveButton.addEventListener('click', () => {});
   if (els.printButton) els.printButton.addEventListener('click', () => window.print());
+  
+  if (els.exportButton) {
+    els.exportButton.addEventListener('click', (e) => {
+      e.preventDefault();
+      if (typeof exportReportToExcel === 'function') {
+        exportReportToExcel();
+      } else if (typeof exportToExcel === 'function') {
+        exportToExcel();
+      } else {
+        alert('Excel Export logic is still loading. Please wait a moment.');
+      }
+    });
+  }
   if (els.loadButton) els.loadButton.addEventListener('click', () => {});
 
   syncFromLoyverse();
