@@ -319,6 +319,7 @@ async function exportReportToExcel() {
           ];
 
           let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+          let isThcGummy = itemName.includes('thc gummy');
           
           let fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju'];
           let hasFBKeyword = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
@@ -328,10 +329,13 @@ async function exportReportToExcel() {
 
           // Only add items with net price > 0.01 to the export list (filter out free items)
           if (itemNetPrice > 0.01) {
+            // Gram Logic: THC Gummy is a flower strain but we don't show grams for it as requested
+            const showAsGram = isFlowerStrain && !isThcGummy;
+            
             const exportItem = {
               name: item.name || item.item_name,
-              qty: isFlowerStrain ? '-' : qty,
-              gram: isFlowerStrain ? `${qty.toFixed(3)} G` : '-',
+              qty: showAsGram ? '-' : qty,
+              gram: showAsGram ? `${qty.toFixed(3)} G` : '-',
               unitPrice: grossPrice / (qty || 1),
               totalPrice: itemNetPrice,
               discount: discountStr,

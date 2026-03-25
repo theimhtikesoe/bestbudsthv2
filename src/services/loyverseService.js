@@ -347,7 +347,12 @@ function extractLineItemPrice(lineItem) {
     return normalizeMoney(directAmount);
   }
 
-  // Fallback to gross amount minus explicit discounts if net is not directly available
+  // Fallback to gross amount minus explicit dfunction extractLineItemPrice(lineItem) {
+  // Try direct total_money first as it's the final net amount
+  if (lineItem?.total_money?.amount !== undefined) {
+    return normalizeMoney(lineItem.total_money.amount);
+  }
+
   const grossAmount = 
     lineItem?.gross_sales_money?.amount ??
     lineItem?.subtotal_money?.amount ??
@@ -398,12 +403,15 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       }
     }
     let normalizedCategory = category || 'uncategorized';
-    let price = extractLineItemPrice(lineItem);
+    let itemTotal = extractLineItemPrice(lineItem);
+    
+    // Skip Price 0 items
+    if (itemTotal <= 0.01) continue;
+
     let qty = extractLineItemQty(lineItem);
-    let itemTotal = price; // In backend, price is already the total for the line item
 
     // --- [1] LEMON CHERRY OVERRIDE (7G Fix) ---
-    if (itemName.includes('lemon cherry') && itemTotal === 4970) {
+    if (itemName.includes('lemon cherry') && itemTotal >= 4970) {
       qty = 7; 
     }
 
@@ -427,10 +435,12 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
       'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
       'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-      'free pina colada'
+      'free pina colada',
+      'thc gummy'
     ];
 
     let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+    let isThcGummy = itemName.includes('thc gummy');
 
     let isFB = !isFlowerStrain && (normalizedCategory.includes('soft drink') || 
                 normalizedCategory.includes('snacks') || 
@@ -475,14 +485,10 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       numeratorPrice += itemTotal;
       
       // --- [NEW] Gram Exclusion Logic ---
-      // 1. Price 0 (THB 0) items are excluded
-      // 2. Name containing "free" are excluded
-      // 3. "The Lobby Shirt" is excluded
-      // 4. 100% Discounted items are excluded (itemTotal would be 0)
-      const isFree = itemTotal <= 0 || itemName.includes('free');
       const isLobbyShirt = itemName.includes('the lobby shirt');
       
-      if (!isFree && !isLobbyShirt) {
+      // Exclude Lobby Shirt and THC Gummy from gram totals
+      if (!isLobbyShirt && !isThcGummy) {
         totalGram += qty;
         if (!mainItemName) {
           mainItemName = String(lineItem.item_name || lineItem.name || "").trim();

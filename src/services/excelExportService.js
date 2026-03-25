@@ -46,7 +46,8 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
     'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
     'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
     'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-    'free pina colada'
+    'free pina colada',
+    'thc gummy'
   ];
 
   const fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju'];
@@ -76,6 +77,7 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
       if (netPrice <= 0) return;
 
       const isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+      const isThcGummy = itemName.includes('thc gummy');
       const isFB = !isFlowerStrain && (
         fbKeywords.some(k => itemName.includes(k) || category.includes(k)) ||
         (['tea'].some(k => itemName.includes(k) || category.includes(k)) && !itemName.includes('tea time')) ||
@@ -97,9 +99,8 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
       } else {
         receiptFlowerItems.push(itemInfo);
         // Gram calculation logic
-        const isFree = netPrice <= 0 || itemName.includes('free');
         const isLobbyShirt = itemName.includes('the lobby shirt');
-        if (!isFree && !isLobbyShirt) {
+        if (!isLobbyShirt && !isThcGummy) {
           totalFlowerGrams += qty;
         }
       }
@@ -107,14 +108,17 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
 
     if (receiptFlowerItems.length > 0) {
       const names = receiptFlowerItems.map(i => i.name).join(' / ');
-      const qtys = receiptFlowerItems.map(i => '-').join(' / ');
+      const qtys = receiptFlowerItems.map(i => {
+        const isThcGummy = (i.name || '').toLowerCase().includes('thc gummy');
+        return isThcGummy ? i.qty : '-';
+      }).join(' / ');
       const prices = receiptFlowerItems.map(i => i.unitPrice.toFixed(2)).join(' / ');
       const total = receiptFlowerItems.reduce((sum, i) => sum + i.totalPrice, 0);
       const grams = receiptFlowerItems.reduce((sum, i) => {
         const itemName = (i.name || '').toLowerCase();
-        const isFree = i.totalPrice <= 0 || itemName.includes('free');
+        const isThcGummy = itemName.includes('thc gummy');
         const isLobbyShirt = itemName.includes('the lobby shirt');
-        return (!isFree && !isLobbyShirt) ? sum + i.qty : sum;
+        return (!isLobbyShirt && !isThcGummy) ? sum + i.qty : sum;
       }, 0);
 
       flowerItems.push({

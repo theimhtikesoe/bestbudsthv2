@@ -272,19 +272,23 @@ function processOrdersData(data) {
       let itemName = String(item?.name || item?.item_name || "").toLowerCase();
       let category = String(item?.category_name || "").toLowerCase();
       
-      // --- Zero-Value Gatekeeper Rule ---
-      let grossPrice = Number(item?.gross_total_money ?? item?.total_money ?? (Number(item?.price ?? 0) * Number(item?.quantity ?? item?.qty ?? 0)));
+      // --- Zero-Value Gatekeeper Ru      // --- Zero-Value Gatekeeper Rule ---
+      let grossPrice = Number(item?.gross_total_money?.amount ?? item?.gross_total_money ?? item?.total_money?.amount ?? item?.total_money ?? (Number(item?.price ?? 0) * Number(item?.quantity ?? item?.qty ?? 0)));
       
       // Calculate item-level net price (after line-item discounts)
-      let lineItemNetPrice = Number(item?.total_money ?? item?.total_price ?? item?.line_total ?? grossPrice);
-      if (item?.total_discount_money || item?.discount_money) {
-        lineItemNetPrice = grossPrice - Number(item?.total_discount_money ?? item?.discount_money ?? 0);
+      let lineItemNetPrice = Number(item?.total_money?.amount ?? item?.total_money ?? 0);
+      if (lineItemNetPrice === 0 && grossPrice > 0) {
+        lineItemNetPrice = grossPrice - Number(item?.total_discount_money?.amount ?? item?.total_discount_money ?? item?.discount_money?.amount ?? item?.discount_money ?? 0);
       }
 
       // Further adjust for order-level discounts
       let itemNetPrice = lineItemNetPrice;
-      if (hasOrderDiscount && orderTotalMoney > 0) {
+      if (hasOrderDiscount && orderTotalMoney > 0 && lineItemNetPrice > 0) {
         itemNetPrice = lineItemNetPrice - (lineItemNetPrice / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
+      }
+
+      // Skip processing if final net price is 0 (Price 0 items)
+      if (itemNetPrice <= 0.01) return;Price / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
       }
 
       let qty = Number(item?.quantity ?? item?.qty ?? 0);
@@ -312,14 +316,14 @@ function processOrdersData(data) {
 
       // Special case: Item is a Flower/Main strain
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+      let isThcGummy = itemName.includes('thc gummy');
       
       let isFB = !isFlowerStrain && (['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju']
                  .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || 
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')) ||
                  (grossPrice / (qty || 1)) <= 50);
 
-      // Gram Exclusion Logic
-      // 100% Discounted items (itemNetPrice === 0) are strictly excluded from gram      const isLobbyShirt = itemName.includes('the lobby shirt');
+      const isLobbyShirt = itemName.includes('the lobby shirt');
 
       // Routing Logic
       if (isFB) {
@@ -329,20 +333,20 @@ function processOrdersData(data) {
       } else {
         mainAndAccPrice += itemNetPrice;
         
-        if (!isFree && !isLobbyShirt) {
+        // Gram Logic: Exclude Lobby Shirt and THC Gummy from gram totals
+        if (!isLobbyShirt && !isThcGummy) {
           orderLineGram += qty;
           if (!mainItemName) mainItemName = item?.item_name || item?.name;
         }
       }
-      // Add to detailed items list (Only if net price > 0 or not a free item)
-      if (itemNetPrice > 0) {
-        detailedItems.push({
-          grams: !isFB && !isAcc && !isFree && !isLobbyShirt ? qty : 0,
-          itemName: item?.item_name || item?.name || 'Unknown Item',
-          mainPrice: isFB ? 0 : itemNetPrice,
-          fbPrice: isFB ? itemNetPrice : 0
-        });
-      }
+      
+      // Add to detailed items list
+      detailedItems.push({
+        grams: !isFB && !isAcc && !isLobbyShirt && !isThcGummy ? qty : 0,
+        itemName: item?.item_name || item?.name || 'Unknown Item',
+        mainPrice: isFB ? 0 : itemNetPrice,
+        fbPrice: isFB ? itemNetPrice : 0
+      });
     });
 
     totalGrams += orderLineGram;
