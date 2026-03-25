@@ -175,12 +175,35 @@ window.exportReportToExcel = async function() {
     const rawData = window.lastSyncedData;
     const expenses = getLocalExpenses(date);
 
-    if (!rawData || !rawData.receipts) {
-      window.showMessage("No synced data available for this date. Please sync first.", "danger");
-      return;
-    }
+    // Check for synced data in various possible formats
+    // Backend might return receipts in 'orders' or 'receipts' or 'items'
+    const receipts = rawData?.orders || rawData?.receipts || rawData?.items || [];
+    
+    console.log('Exporting data. RawData:', rawData);
+    console.log('Extracted receipts:', receipts);
 
-    const receipts = rawData.receipts;
+    // If no data in memory, try to trigger a sync or show error
+    if (!rawData || (receipts.length === 0 && !rawData.net_sale)) {
+      // If auto-sync is working, maybe we just need to wait or try to fetch it
+      window.showMessage("No synced data found in memory. Attempting to re-sync...", "info");
+      
+      // Try to call the sync function if it exists
+      if (typeof window.syncFromLoyverse === 'function') {
+        await window.syncFromLoyverse();
+        // Re-check after sync
+        const newData = window.lastSyncedData;
+        const newReceipts = newData?.orders || newData?.receipts || newData?.items || [];
+        if (!newData || (newReceipts.length === 0 && !newData.net_sale)) {
+          window.showMessage("Still no data available after re-sync. Please check Loyverse for this date.", "danger");
+          return;
+        }
+        // Continue with new data
+        return exportReportToExcel(); // Recursive call once
+      } else {
+        window.showMessage("No synced data available. Please click 'Sync From Loyverse' first.", "danger");
+        return;
+      }
+    }
     const cashTotal = Number(rawData.cash_total || 0);
     const cardTotal = Number(rawData.card_total || 0);
     const transferTotal = Number(rawData.transfer_total || 0);
@@ -221,24 +244,46 @@ window.exportReportToExcel = async function() {
         const discountStr = totalItemDiscount > 0.01 ? `${discountPercent.toFixed(0)}% (${totalItemDiscount.toFixed(2)} THB)` : "-";
 
         const flowerStrains = [
-          "grape soda", "blue pave", "devil driver", "lemon cherry gelato", 
-          "moonbow", "emergen c", "tea time", "silver shadow", 
-          "rozay cake", "truffaloha", "the planet of grape", "crunch berriez",
-          "big foot", "honey bee", "jealousy mintz", "crystal candy",
-          "alien mint", "rocket fuel", "gold dust", "darth vader",
-          "cherry pop tarts", "white cherry gelato", "dosidos", "obama runtz",
-          "free pina colada", "thc gummy"
+          'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
+          'moonbow', 'emergen c', 'tea time', 'silver shadow', 
+          'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez',
+          'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
+          'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
+          'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
+          'free pina colada', 'flower', 'bud', 'pre-roll', 'joint'
+        ];
+
+        const fbKeywords = [
+          'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
+          'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
+          'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
+        ];
+
+        const accessoryKeywords = [
+          'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
+          'shirt', 'hat', 'lighter', 'the lobby', 'merch'
         ];
 
         let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
         let isThcGummy = itemName.includes("thc gummy");
         let isLobbyShirt = itemName.includes("the lobby shirt");
 
-        let fbKeywords = ["soft drink", "snacks", "gummy", "water", "soda", "milk", "beer", "drink", "beverage", "alcohol", "wine", "cider", "spirit", "cocktail", "food", "coffee", "juice", "bakery", "cookie", "brownie", "cake", "soju"];
-        let hasFBKeyword = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
-                           (["tea"].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes("tea time"));
+        let isFB = !isFlowerStrain && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+                   (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
 
-        let isFB = !isFlowerStrain && (hasFBKeyword || (grossPrice / (qty || 1)) <= 50);
+        // Fallback to price if not clearly classified by name
+        if (!isFlowerStrain && !isFB) {
+          const unitPrice = grossPrice / (qty || 1);
+          if (unitPrice <= 50 && unitPrice > 0) {
+            isFB = true;
+          } else {
+            // Check if it's an accessory
+            const isAcc = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
+            if (!isAcc) {
+              isFlowerStrain = true; // Default to Main/Flower
+            }
+          }
+        }
 
         const exportItem = {
           type: isFB ? "F&B" : "Flower/Main",

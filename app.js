@@ -118,6 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
         renderEntries(els.discountEntriesList, els.discountEntriesTotal, data.discount_entries || [], 'THB', true);
 
         window.lastSyncedData = data; // Ensure data is available for Excel export
+        console.log('Data stored in window.lastSyncedData:', window.lastSyncedData);
         showMessage('Data synced successfully from Loyverse');
       } else {
         showMessage(result.message || 'Failed to sync data', 'danger');
@@ -131,6 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  window.syncFromLoyverse = syncFromLoyverse;
   if (els.syncButton) els.syncButton.addEventListener('click', syncFromLoyverse);
   if (els.saveButton) els.saveButton.addEventListener('click', () => {});
   if (els.printButton) els.printButton.addEventListener('click', () => window.print());

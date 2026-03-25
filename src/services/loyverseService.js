@@ -3,6 +3,7 @@ const dayjs = require('dayjs');
 const utc = require('dayjs/plugin/utc');
 const timezone = require('dayjs/plugin/timezone');
 const { calculateNetSale, normalizeMoney, roundCurrency, toNumber } = require('../utils/calculations');
+const itemClassifier = require('./itemClassifier');
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -415,68 +416,22 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       qty = 7; 
     }
 
-    // --- [2] CATEGORY IDENTIFICATION ---
-    let isAcc = normalizedCategory.includes('accessories') || 
-                normalizedCategory.includes('merchandise') ||
-                itemName.includes('accessories') || 
-                itemName.includes('bong') || 
-                itemName.includes('paper') || 
-                itemName.includes('tip') || 
-                itemName.includes('grinder') ||
-                itemName.includes('shirt') ||
-                itemName.includes('hat') ||
-                itemName.includes('lighter') ||
-                itemName.includes('the lobby') ||
-                itemName.includes('merch');
-    const flowerStrains = [
-      'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
-      'moonbow', 'emergen c', 'tea time', 'silver shadow', 
-      'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez',
-      'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
-      'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
-      'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-      'free pina colada',
-      'thc gummy'
-    ];
-
-    let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
-    let isThcGummy = itemName.includes('thc gummy');
-
-    let isFB = !isFlowerStrain && (normalizedCategory.includes('soft drink') || 
-                normalizedCategory.includes('snacks') || 
-                normalizedCategory.includes('beverage') ||
-                normalizedCategory.includes('drink') ||
-                normalizedCategory.includes('food') ||
-                normalizedCategory.includes('bakery') ||
-                itemName.includes('gummy') || 
-                itemName.includes('water') || 
-                itemName.includes('soda') ||
-                itemName.includes('beer') ||
-                itemName.includes('drink') ||
-                itemName.includes('beverage') ||
-                itemName.includes('alcohol') ||
-                itemName.includes('wine') ||
-                itemName.includes('cider') ||
-                itemName.includes('spirit') ||
-                itemName.includes('cocktail') ||
-                itemName.includes('milk') ||
-                itemName.includes('coffee') ||
-                (itemName.includes('tea') && !itemName.includes('tea time')) ||
-                itemName.includes('juice') ||
-                itemName.includes('cookie') ||
-                itemName.includes('brownie') ||
-                itemName.includes('cake') || itemName.includes('soju'));
+    // --- [2] CATEGORY IDENTIFICATION (Using itemClassifier) ---
+    const unitPrice = qty > 0 ? roundCurrency(itemTotal / qty) : itemTotal;
+    const classification = itemClassifier.classifyItem(itemName, normalizedCategory, unitPrice);
+    
+    const isFlowerStrain = classification === 'main';
+    const isFB = classification === 'fb';
+    const isAcc = classification === 'accessory';
+    const isThcGummy = itemName.includes('thc gummy');
 
     // --- [3] THE BEST BUDS ROUTING LOGIC ---
-    // Note: In backend, we need to determine unit price for the <= 50 check
-    const unitPrice = qty > 0 ? roundCurrency(itemTotal / qty) : itemTotal;
-
-    if ((unitPrice <= 50 || isFB) && !isFlowerStrain) {
-      // Group B: F&B (ဒါမှမဟုတ် 50 THB အောက် Item တွေ)
+    if (isFB) {
+      // Group B: F&B
       // Action -> ညာဘက်မှာထားမယ်, Gram 0.000
       denominatorPrice += itemTotal;
     } else if (isAcc) {
-      // Group C: Real Accessories (50 THB ထက်ကြီးသော အသုံးအဆောင်များ)
+      // Group C: Real Accessories
       // Action -> ဘယ်ဘက်မှာထားမယ်, Gram 0.000
       numeratorPrice += itemTotal;
     } else {

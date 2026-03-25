@@ -287,22 +287,45 @@ function processOrdersData(data) {
       }
 
       const flowerStrains = [
-        'mac stormper', 'cheese candy', 'planet of the grape', 'crystal candy', 'crystal fuel',
-        'crunch berriez', 'white cherry gelato', 'bubblegum marker', 'jealousy mintz', 'lemon cherry gelato', 'devil driver', 'honey bee',
-        'emergen c', 'rocket fuel', 'grape soda', 'blue pave', 'vino tinto', 'rozay cake', 'tea time',
-        'big foot',
-        'moonbow', 'silver shadow', 'truffaloha', 'alien mint', 'gold dust', 'darth vader',
-        'cherry pop tarts', 'dosidos', 'obama runtz', 'free pina colada', 'thc gummy'
+        'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
+        'moonbow', 'emergen c', 'tea time', 'silver shadow', 
+        'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez',
+        'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
+        'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
+        'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
+        'free pina colada', 'flower', 'bud', 'pre-roll', 'joint'
+      ];
+
+      const fbKeywords = [
+        'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
+        'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
+        'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
+      ];
+
+      const accessoryKeywords = [
+        'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
+        'shirt', 'hat', 'lighter', 'the lobby', 'merch'
       ];
 
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
       
-      let fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju'];
-      let hasFBKeyword = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
-                         (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
+      let isFB = !isFlowerStrain && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
 
-      let isFB = !isFlowerStrain && (hasFBKeyword || (grossPrice / (qty || 1)) <= 50);
+      // Fallback to price if not clearly classified by name
+      if (!isFlowerStrain && !isFB) {
+        const unitPrice = grossPrice / (qty || 1);
+        if (unitPrice <= 50 && unitPrice > 0) {
+          isFB = true;
+        } else {
+          // Check if it's an accessory
+          const isAcc = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
+          if (!isAcc) {
+            isFlowerStrain = true; // Default to Main/Flower
+          }
+        }
+      }
 
       if (isFB) {
         fbPriceTotal += itemNetPrice;
@@ -353,22 +376,45 @@ function processAutomatedReportRows(data) {
       let price = Number(item?.price || 0);
 
       const flowerStrains = [
-        'mac stormper', 'cheese candy', 'planet of the grape', 'crystal candy', 'crystal fuel',
-        'crunch berriez', 'white cherry gelato', 'bubblegum marker', 'jealousy mintz', 'lemon cherry gelato', 'devil driver', 'honey bee',
-        'emergen c', 'rocket fuel', 'grape soda', 'blue pave', 'vino tinto', 'rozay cake', 'tea time',
-        'big foot',
-        'moonbow', 'silver shadow', 'truffaloha', 'alien mint', 'gold dust', 'darth vader',
-        'cherry pop tarts', 'dosidos', 'obama runtz', 'free pina colada', 'thc gummy'
+        'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
+        'moonbow', 'emergen c', 'tea time', 'silver shadow', 
+        'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez',
+        'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
+        'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
+        'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
+        'free pina colada', 'flower', 'bud', 'pre-roll', 'joint'
+      ];
+
+      const fbKeywords = [
+        'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
+        'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
+        'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
+      ];
+
+      const accessoryKeywords = [
+        'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
+        'shirt', 'hat', 'lighter', 'the lobby', 'merch'
       ];
 
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
+      
+      let isFB = !isFlowerStrain && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
 
-      let fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju'];
-      let hasFBKeyword = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
-                         (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
-
-      let isFB = !isFlowerStrain && (hasFBKeyword || (price / (qty || 1)) <= 50);
+      // Fallback to price if not clearly classified by name
+      if (!isFlowerStrain && !isFB) {
+        const unitPrice = price / (qty || 1);
+        if (unitPrice <= 50 && unitPrice > 0) {
+          isFB = true;
+        } else {
+          // Check if it's an accessory
+          const isAcc = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
+          if (!isAcc) {
+            isFlowerStrain = true; // Default to Main/Flower
+          }
+        }
+      }
 
       if (isFB) {
         fbPriceTotal += price;
