@@ -115,15 +115,21 @@ function normalizeEntries(entries) {
     if (entry && typeof entry === 'object' && !Array.isArray(entry)) {
       // Prioritize discounted amount if available (net amount)
       // Loyverse usually provides 'total_money' or 'amount' as the final paid amount
-      amount = entry.total_money?.amount ?? entry.amount_money?.amount ?? entry.money_amount?.amount ?? entry.amount ?? 0;
-      
+      let grossAmount = entry.total_money?.amount ?? entry.amount_money?.amount ?? entry.money_amount?.amount ?? entry.amount ?? 0;
       percentage = parsePercentage(entry.percentage ?? entry.percent ?? entry.rate);
+
+      // Apply discount if percentage is present
+      if (percentage > 0) {
+        amount = grossAmount * (1 - percentage / 100);
+      } else {
+        amount = grossAmount;
+      }
       time = entry.time || null;
       receiptNumber = entry.receiptNumber || entry.receipt_number || entry.number || null;
       // Ensure mainAccTotal and fbTotal reflect discounted prices
       // If main_acc_total or fb_total are not explicitly provided as discounted, derive them from the overall discounted 'amount'
-      mainAccTotal = entry.main_acc_total || (entry.amount - (entry.fb_total || 0));
-      fbTotal = entry.fb_total || (entry.amount - (entry.main_acc_total || 0));
+      mainAccTotal = entry.main_acc_total || (amount - (entry.fb_total || 0));
+      fbTotal = entry.fb_total || (amount - (entry.main_acc_total || 0));
       
       // Fallback if still zero or negative after derivation, use the amount directly
       if (mainAccTotal <= 0 && fbTotal <= 0) {
