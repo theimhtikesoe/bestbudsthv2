@@ -261,8 +261,8 @@ window.exportReportToExcel = async function() {
         if (itemNetPrice <= 0 && qty <= 0) return;
 
         const totalItemDiscount = grossPrice - itemNetPrice;
-        const discountPercent = grossPrice > 0 ? (totalItemDiscount / grossPrice * 100) : 0;
-        const discountStr = totalItemDiscount > 0.01 ? `${discountPercent.toFixed(0)}% (${totalItemDiscount.toFixed(2)} THB)` : "-";
+        const discountPercent = grossPrice > 0 ? Math.round(totalItemDiscount / grossPrice * 100) : 0;
+        const discountStr = totalItemDiscount > 0.01 ? `${discountPercent}% (${totalItemDiscount.toFixed(2)} THB)` : "-";
 
         const flowerStrains = [
           'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
