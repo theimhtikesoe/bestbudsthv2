@@ -254,6 +254,13 @@ body {
   font-weight: 800;
   font-size: 1.1rem;
   line-height: 1.1;
+  word-break: break-word;
+}
+
+@media (max-width: 1200px) {
+  .gram-stat-value {
+    font-size: 1rem;
+  }
 }
 
 #reportSection .btn {
@@ -271,13 +278,37 @@ body {
 
 .detail-box-head {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   padding: 10px 12px;
+  gap: 8px;
   border-bottom: 1px solid #3a3020;
   background: linear-gradient(180deg, #2a2010, #1e1608);
   color: #c8882e;
   font-weight: 700;
+}
+
+.detail-box-head span {
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.detail-box-head strong {
+  font-size: 1rem;
+  word-break: break-all;
+}
+
+@media (max-width: 1024px) {
+  .detail-box-head {
+    padding: 8px 10px;
+  }
+  .detail-box-head span {
+    font-size: 0.8rem;
+  }
+  .detail-box-head strong {
+    font-size: 0.9rem;
+  }
 }
 
 .detail-list {
@@ -289,10 +320,13 @@ body {
 }
 
 .detail-list li {
-  padding: 4px 0;
+  padding: 6px 0;
   color: #c8c0b4;
   font-weight: 600;
   border-bottom: 1px dashed rgba(100, 80, 40, 0.3);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  word-break: break-word;
 }
 
 .detail-list li:last-child {
@@ -370,6 +404,30 @@ body {
 .diff-negative {
   color: var(--negative);
   font-weight: 700;
+}
+
+/* iPad Specific Fixes */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .container {
+    max-width: 95% !important;
+  }
+  .row.g-3 > .col-md-3 {
+    width: 50% !important;
+  }
+  .row.g-3 > .col-md-2 {
+    width: 33.33% !important;
+  }
+}
+
+/* Mobile Fixes */
+@media (max-width: 767px) {
+  .row.g-3 > .col-md-3,
+  .row.g-3 > .col-md-2 {
+    width: 100% !important;
+  }
+  .detail-box {
+    min-height: auto;
+  }
 }
 
 /* BestBuds Order Report table */
