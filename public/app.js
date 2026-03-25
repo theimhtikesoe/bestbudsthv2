@@ -319,10 +319,7 @@ function processOrdersData(data) {
                  (grossPrice / (qty || 1)) <= 50);
 
       // Gram Exclusion Logic
-      // 100% Discounted items (itemNetPrice === 0) are strictly excluded from grams
-      const isFree = itemNetPrice <= 0 || itemName.includes('free');
-      const isLobbyShirt = itemName.includes('the lobby shirt');
-      const isThcGummy = itemName.includes('thc gummy');
+      // 100% Discounted items (itemNetPrice === 0) are strictly excluded from gram      const isLobbyShirt = itemName.includes('the lobby shirt');
 
       // Routing Logic
       if (isFB) {
@@ -332,16 +329,15 @@ function processOrdersData(data) {
       } else {
         mainAndAccPrice += itemNetPrice;
         
-        if (!isFree && !isLobbyShirt && !isThcGummy) {
+        if (!isFree && !isLobbyShirt) {
           orderLineGram += qty;
           if (!mainItemName) mainItemName = item?.item_name || item?.name;
         }
       }
-
       // Add to detailed items list (Only if net price > 0 or not a free item)
       if (itemNetPrice > 0) {
         detailedItems.push({
-          grams: !isFB && !isAcc && !isFree && !isLobbyShirt && !isThcGummy ? qty : 0,
+          grams: !isFB && !isAcc && !isFree && !isLobbyShirt ? qty : 0,
           itemName: item?.item_name || item?.name || 'Unknown Item',
           mainPrice: isFB ? 0 : itemNetPrice,
           fbPrice: isFB ? itemNetPrice : 0

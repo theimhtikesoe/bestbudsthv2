@@ -319,7 +319,6 @@ async function exportReportToExcel() {
           ];
 
           let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
-          let isThcGummy = itemName.includes('thc gummy');
           
           let fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju'];
           let hasFBKeyword = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
@@ -329,11 +328,10 @@ async function exportReportToExcel() {
 
           // Only add items with net price > 0.01 to the export list (filter out free items)
           if (itemNetPrice > 0.01) {
-            const isGramItem = isFlowerStrain && !isThcGummy;
             const exportItem = {
               name: item.name || item.item_name,
-              qty: isGramItem ? '-' : qty,
-              gram: isGramItem ? `${qty.toFixed(3)} G` : '-',
+              qty: isFlowerStrain ? '-' : qty,
+              gram: isFlowerStrain ? `${qty.toFixed(3)} G` : '-',
               unitPrice: grossPrice / (qty || 1),
               totalPrice: itemNetPrice,
               discount: discountStr,
@@ -355,45 +353,49 @@ async function exportReportToExcel() {
     const setHeaderStyle = (cell) => {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD3D3D3' } };
       cell.font = { bold: true };
-      cell.alignment = { horizontal: 'center' };
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
     };
 
     const setBorder = (cell) => {
-      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
     };
 
-    // --- HEADER: Date & Staff ---
-    sheet.mergeCells('A1:H1');
-    sheet.getCell('A1').value = `Daily Report - ${date}`;
-    sheet.getCell('A1').font = { size: 14, bold: true };
-    sheet.getCell('A1').alignment = { horizontal: 'center' };
-
-    sheet.mergeCells('A2:H2');
-    sheet.getCell('A2').value = `Closing Staff: ${staffName}`;
-    sheet.getCell('A2').font = { size: 12, bold: true, color: { argb: 'FF555555' } };
-    sheet.getCell('A2').alignment = { horizontal: 'center' };
+    // Set Header
+    sheet.getCell('A1').value = `Daily Report: ${date}`;
+    sheet.getCell('A1').font = { size: 16, bold: true };
+    sheet.getCell('A2').value = `Staff: ${staffName}`;
+    sheet.mergeCells('A1:I1');
+    sheet.mergeCells('A2:I2');
 
     let currRow = 4;
-    sheet.getCell(`A${currRow}`).value = 'Flower / Main / Accessories';
-    sheet.getCell(`A${currRow}`).font = { bold: true, color: { argb: 'FF0000FF' } };
-    currRow++;
 
-    const headers = ['Item Type', 'Item Name', 'Qty', 'Gram', 'Unit Price', 'Discount', 'Net Price', 'Payment', 'Note'];
-    headers.forEach((h, i) => {
-      const cell = sheet.getCell(currRow, i + 1);
+    // --- SECTION 1: FLOWERS & ACCESSORIES ---
+    const flowerHeaders = ['Type', 'Item Name', 'Discount', 'Qty', 'Gram', 'Unit Price', 'Total Price', 'Payment', 'Note'];
+    flowerHeaders.forEach((h, i) => {
+      const cell = sheet.getCell(`${String.fromCharCode(65 + i)}${currRow}`);
       cell.value = h;
       setHeaderStyle(cell);
     });
     currRow++;
 
     flowerItems.forEach(item => {
-      sheet.getCell(`A${currRow}`).value = 'Flower/Main';
+      sheet.getCell(`A${currRow}`).value = 'Flower / Acc';
       sheet.getCell(`B${currRow}`).value = item.name;
-      sheet.getCell(`C${currRow}`).value = item.qty;
-      sheet.getCell(`D${currRow}`).value = item.gram;
-      sheet.getCell(`E${currRow}`).value = item.unitPrice;
-      sheet.getCell(`F${currRow}`).value = item.discount;
+      sheet.getCell(`C${currRow}`).value = item.discount;
+      sheet.getCell(`D${currRow}`).value = item.qty;
+      sheet.getCell(`E${currRow}`).value = item.gram;
+      sheet.getCell(`F${currRow}`).value = item.unitPrice;
       sheet.getCell(`G${currRow}`).value = item.totalPrice;
       sheet.getCell(`H${currRow}`).value = item.payment;
       sheet.getCell(`I${currRow}`).value = item.note;
@@ -404,12 +406,12 @@ async function exportReportToExcel() {
 
     // --- SECTION 2: EXPENSES ---
     sheet.getCell(`A${currRow}`).value = 'Expenses';
-    sheet.getCell(`A${currRow}`).font = { bold: true, color: { argb: 'FFFF0000' } };
+    sheet.getCell(`A${currRow}`).font = { bold: true, size: 12 };
     currRow++;
-
-    const expenseHeaders = ['Category', 'Description', 'Amount'];
-    expenseHeaders.forEach((h, i) => {
-      const cell = sheet.getCell(currRow, i + 1);
+    
+    const expHeaders = ['Category', 'Description', 'Amount'];
+    expHeaders.forEach((h, i) => {
+      const cell = sheet.getCell(`${String.fromCharCode(65 + i)}${currRow}`);
       cell.value = h;
       setHeaderStyle(cell);
     });
@@ -417,22 +419,27 @@ async function exportReportToExcel() {
 
     let totalExp = 0;
     expenses.forEach(exp => {
-      sheet.getCell(`A${currRow}`).value = exp.category;
-      sheet.getCell(`B${currRow}`).value = exp.description || '-';
-      sheet.getCell(`C${currRow}`).value = exp.amount;
       totalExp += exp.amount;
+      sheet.getCell(`A${currRow}`).value = exp.category;
+      sheet.getCell(`B${currRow}`).value = exp.description;
+      sheet.getCell(`C${currRow}`).value = exp.amount;
       ['A','B','C'].forEach(col => setBorder(sheet.getCell(`${col}${currRow}`)));
       currRow++;
     });
+
+    sheet.getCell(`B${currRow}`).value = 'Total Expenses';
+    sheet.getCell(`C${currRow}`).value = totalExp;
+    sheet.getCell(`C${currRow}`).font = { bold: true };
     currRow += 2;
 
     // --- SECTION 3: FOOD & DRINKS ---
     sheet.getCell(`A${currRow}`).value = 'Food & Drinks';
-    sheet.getCell(`A${currRow}`).font = { bold: true, color: { argb: 'FF008000' } };
+    sheet.getCell(`A${currRow}`).font = { bold: true, size: 12 };
     currRow++;
 
-    headers.forEach((h, i) => {
-      const cell = sheet.getCell(currRow, i + 1);
+    const fbHeaders = ['Type', 'Item Name', 'Discount', 'Qty', 'Gram', 'Unit Price', 'Total Price', 'Payment', 'Note'];
+    fbHeaders.forEach((h, i) => {
+      const cell = sheet.getCell(`${String.fromCharCode(65 + i)}${currRow}`);
       cell.value = h;
       setHeaderStyle(cell);
     });
@@ -441,10 +448,10 @@ async function exportReportToExcel() {
     fbItems.forEach(item => {
       sheet.getCell(`A${currRow}`).value = 'F&B';
       sheet.getCell(`B${currRow}`).value = item.name;
-      sheet.getCell(`C${currRow}`).value = item.qty;
-      sheet.getCell(`D${currRow}`).value = item.gram;
-      sheet.getCell(`E${currRow}`).value = item.unitPrice;
-      sheet.getCell(`F${currRow}`).value = item.discount;
+      sheet.getCell(`C${currRow}`).value = item.discount;
+      sheet.getCell(`D${currRow}`).value = item.qty;
+      sheet.getCell(`E${currRow}`).value = item.gram;
+      sheet.getCell(`F${currRow}`).value = item.unitPrice;
       sheet.getCell(`G${currRow}`).value = item.totalPrice;
       sheet.getCell(`H${currRow}`).value = item.payment;
       sheet.getCell(`I${currRow}`).value = item.note;
