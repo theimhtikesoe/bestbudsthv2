@@ -10,23 +10,15 @@ window.lastSyncedData = null;
  * Moved to global scope so it can be called from other scripts
  */
 window.showMessage = function(message, type = 'info') {
-  const alertContainer = document.getElementById('alertContainer');
+  const alertContainer = document.getElementById('message'); // Matches index.html alert div
   if (!alertContainer) return;
 
-  const wrapper = document.createElement('div');
-  wrapper.innerHTML = [
-    `<div class="alert alert-${type} alert-dismissible fade show" role="alert">`,
-    `   <div>${message}</div>`,
-    '   <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>',
-    '</div>'
-  ].join('');
+  alertContainer.className = `alert alert-${type} d-block`;
+  alertContainer.innerHTML = message;
 
-  alertContainer.append(wrapper);
-
-  // Auto-dismiss after 5 seconds
+  // Auto-hide after 5 seconds
   setTimeout(() => {
-    const alert = bootstrap.Alert.getOrCreateInstance(wrapper.firstChild);
-    if (alert) alert.close();
+    alertContainer.className = 'alert d-none';
   }, 5000);
 };
 
@@ -51,11 +43,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Handle Sync button
-  const syncBtn = document.getElementById('syncBtn');
+  const syncBtn = document.getElementById('syncButton'); // Matches index.html
   syncBtn?.addEventListener('click', syncData);
 
   // Handle Export button (Mobile-friendly listener)
-  const exportBtn = document.getElementById('exportBtn');
+  const exportBtn = document.getElementById('exportCsvBtn'); // Matches index.html
   if (exportBtn) {
     exportBtn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -66,15 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
-
-  // Handle Expense form
-  const expenseForm = document.getElementById('expenseForm');
-  expenseForm?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (typeof addExpenseToReport === 'function') {
-      addExpenseToReport();
-    }
-  });
 });
 
 /**
@@ -82,7 +65,7 @@ document.addEventListener('DOMContentLoaded', () => {
  */
 async function syncData() {
   const dateInput = document.getElementById('reportDate');
-  const syncBtn = document.getElementById('syncBtn');
+  const syncBtn = document.getElementById('syncButton');
   const date = dateInput?.value;
 
   if (!date) {
@@ -124,11 +107,12 @@ async function syncData() {
  * Update the main dashboard numbers
  */
 function updateDashboard(data) {
-  document.getElementById('cashTotal').value = Number(data.cash_total || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
-  document.getElementById('cardTotal').value = Number(data.card_total || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
-  document.getElementById('transferTotal').value = Number(data.transfer_total || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+  document.getElementById('cashTotal').value = data.cash_total || 0;
+  document.getElementById('cardTotal').value = data.card_total || 0;
+  document.getElementById('transferTotal').value = data.transfer_total || 0;
   document.getElementById('totalOrders').value = data.total_orders || 0;
-  document.getElementById('netSale').value = Number(data.net_sale || 0).toLocaleString(undefined, {minimumFractionDigits: 2});
+  document.getElementById('netSale').value = data.net_sale || 0;
+  document.getElementById('totalGramsSold').innerText = (data.total_gram_qty || 0).toFixed(3) + ' G';
 }
 
 /**
@@ -156,7 +140,7 @@ function renderOrderEntries(receipts) {
         <td>${time}</td>
         <td>${receiptNo}</td>
         <td>${grams.toFixed(3)} G</td>
-        <td>${mainPrice.toLocaleString()} / ${fbPrice.toLocaleString()}</td>
+        <td class="text-end">${mainPrice.toLocaleString()} / ${fbPrice.toLocaleString()}</td>
       </tr>
     `;
   });
@@ -168,11 +152,10 @@ function renderOrderEntries(receipts) {
  * Render detailed line-item sales record
  */
 function renderDetailedSales(receipts) {
-  const container = document.getElementById('detailedSalesBody');
+  const container = document.getElementById('bestBudsSalesBody'); // Matches index.html
   if (!container) return;
 
   const detailedItems = [];
-  let totalGrams = 0;
 
   receipts.forEach(receipt => {
     const items = receipt.line_items || receipt.items || [];
@@ -180,34 +163,24 @@ function renderDetailedSales(receipts) {
     const orderTotalMoney = Number(receipt.total_money?.amount || 0);
     const hasOrderDiscount = orderDiscountMoney > 0;
     
-    let orderLineGram = 0;
-    let mainItemName = '';
-
     items.forEach(item => {
       let itemName = String(item?.name || item?.item_name || "").toLowerCase();
       let category = String(item?.category_name || "").toLowerCase();
       
-      // --- Zero-Value Gatekeeper Rule ---
       let grossPrice = Number(item?.gross_total_money?.amount ?? item?.gross_total_money ?? item?.total_money?.amount ?? item?.total_money ?? (Number(item?.price ?? 0) * Number(item?.quantity ?? item?.qty ?? 0)));
-      
-      // Calculate item-level net price (after line-item discounts)
       let lineItemNetPrice = Number(item?.total_money?.amount ?? item?.total_money ?? 0);
       if (lineItemNetPrice === 0 && grossPrice > 0) {
         lineItemNetPrice = grossPrice - Number(item?.total_discount_money?.amount ?? item?.total_discount_money ?? item?.discount_money?.amount ?? item?.discount_money ?? 0);
       }
 
-      // Further adjust for order-level discounts
       let itemNetPrice = lineItemNetPrice;
       if (hasOrderDiscount && orderTotalMoney > 0 && lineItemNetPrice > 0) {
         itemNetPrice = lineItemNetPrice - (lineItemNetPrice / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
       }
 
-      // Rule: Skip Price 0 items entirely
       if (itemNetPrice <= 0.01) return;
 
       let qty = Number(item?.quantity ?? item?.qty ?? 0);
-
-      // Lemon Cherry Override (7G Fix)
       if (itemName.includes('lemon cherry') && grossPrice >= 4970) {
         qty = 7;
       }
@@ -219,30 +192,18 @@ function renderDetailedSales(receipts) {
         'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
         'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
         'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-        'free pina colada',
-        'thc gummy'
+        'free pina colada', 'thc gummy'
       ];
 
-      // Special case: Item is a Flower/Main strain
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
+      let isLobbyShirt = itemName.includes('the lobby shirt');
       
       let isFB = !isFlowerStrain && (['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju']
                  .some(keyword => itemName.includes(keyword) || category.includes(keyword)) || 
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')) ||
                  (grossPrice / (qty || 1)) <= 50);
 
-      const isLobbyShirt = itemName.includes('the lobby shirt');
-
-      // Routing Logic
-      if (!isFB) {
-        // Gram Logic: Exclude Lobby Shirt and THC Gummy from gram totals
-        if (!isLobbyShirt && !isThcGummy) {
-          orderLineGram += qty;
-        }
-      }
-      
-      // Add to detailed items list
       detailedItems.push({
         grams: !isFB && !isLobbyShirt && !isThcGummy ? qty : 0,
         itemName: item?.item_name || item?.name || 'Unknown Item',
@@ -250,8 +211,6 @@ function renderDetailedSales(receipts) {
         fbPrice: isFB ? itemNetPrice : 0
       });
     });
-
-    totalGrams += orderLineGram;
   });
 
   if (detailedItems.length === 0) {
@@ -265,7 +224,7 @@ function renderDetailedSales(receipts) {
       <tr>
         <td>${item.grams > 0 ? item.grams.toFixed(3) : '-'}</td>
         <td>${item.itemName}</td>
-        <td>${item.mainPrice > 0 ? item.mainPrice.toLocaleString() : '-'} / ${item.fbPrice > 0 ? item.fbPrice.toLocaleString() : '-'}</td>
+        <td class="text-end">${item.mainPrice > 0 ? item.mainPrice.toLocaleString() : '-'} / ${item.fbPrice > 0 ? item.fbPrice.toLocaleString() : '-'}</td>
       </tr>
     `;
   });
