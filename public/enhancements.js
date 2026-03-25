@@ -264,10 +264,11 @@ window.exportReportToExcel = async function() {
         let isThcGummy = itemName.includes("thc gummy");
         let isLobbyShirt = itemName.includes("the lobby shirt");
 
-        let isFB = !isFlowerStrain && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+        // THC Gummy should be Main, not F&B
+        let isFB = !isFlowerStrain && !isThcGummy && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
                    (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
 
-        if (!isFlowerStrain && !isFB) {
+        if (!isFlowerStrain && !isFB && !isThcGummy) {
           const unitPrice = grossPrice / (qty || 1);
           if (unitPrice <= 50 && unitPrice > 0) {
             isFB = true;
@@ -279,11 +280,14 @@ window.exportReportToExcel = async function() {
           }
         }
 
+        // If it's THC Gummy, it's Main/Flower but counted by Qty
+        const isMain = isFlowerStrain || isThcGummy;
+
         const exportItem = {
           type: isFB ? "F&B" : "Flower/Main",
           name: item.name || item.item_name,
-          qty: (isFlowerStrain && !isThcGummy && !isLobbyShirt) ? "-" : qty,
-          gram: (isFlowerStrain && !isThcGummy && !isLobbyShirt) ? `${qty.toFixed(3)} G` : "-",
+          qty: (isMain && !isThcGummy && !isLobbyShirt) ? "-" : qty,
+          gram: (isMain && !isThcGummy && !isLobbyShirt) ? `${qty.toFixed(3)} G` : "-",
           unitPrice: grossPrice / (qty || 1),
           discount: discountStr,
           netPrice: itemNetPrice,
@@ -295,7 +299,8 @@ window.exportReportToExcel = async function() {
           fbItems.push(exportItem);
         } else {
           flowerItems.push(exportItem);
-          if (!isThcGummy && !isLobbyShirt) {
+          // Only add to total grams if it's actual flower (not gummy or shirt)
+          if (isFlowerStrain && !isThcGummy && !isLobbyShirt) {
             totalFlowerGrams += qty;
           }
         }
