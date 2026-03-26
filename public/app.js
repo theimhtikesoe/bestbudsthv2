@@ -751,9 +751,9 @@ function renderOrderEntriesTable(orderEntries, detailedItems = []) {
       const mainValue = item.mainPrice > 0 ? formatCompactNumber(item.mainPrice) : '-';
       const fbValue = item.fbPrice > 0 ? formatCompactNumber(item.fbPrice) : '-';
       html += `
-        <tr>
+        <tr class="detail-row">
           <td></td>
-          <td></td>
+          <td><span class="mobile-item-inline">${item.itemName || '-'}</span></td>
           <td>${itemGram}</td>
           <td>${item.itemName || '-'}</td>
           <td class="text-end">${mainValue}</td>

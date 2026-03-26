@@ -719,6 +719,10 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-variant-numeric: tabular-nums;
 }
 
+#orderEntriesTable .mobile-item-inline {
+  display: none;
+}
+
 @media (max-width: 1024px) {
   .app-header {
     padding-top: 1rem !important;
@@ -773,6 +777,24 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
   #orderEntriesTable {
     min-width: 940px;
+  }
+
+  #orderEntriesTable .mobile-item-inline {
+    display: inline-block;
+    margin-top: 0.16rem;
+    padding: 0.1rem 0.4rem;
+    border-radius: 999px;
+    background: #f3dfbd;
+    border: 1px solid #d1ad72;
+    color: #5b3b17;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.14px;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
   }
 }
 
