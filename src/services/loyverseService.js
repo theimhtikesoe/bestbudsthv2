@@ -331,48 +331,146 @@ function extractLineItemQty(lineItem) {
   return Number.isFinite(normalized) && normalized > 0 ? normalized : 0;
 }
 
+function extractMoneyValue(value) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  if (typeof value === 'object') {
+    if (Object.prototype.hasOwnProperty.call(value, 'amount')) {
+      return extractMoneyValue(value.amount);
+    }
+    if (Object.prototype.hasOwnProperty.call(value, 'value')) {
+      return extractMoneyValue(value.value);
+    }
+  }
+
+  return null;
+}
+
+function pickMoneyValue(...candidates) {
+  for (const candidate of candidates) {
+    const value = extractMoneyValue(candidate);
+    if (value !== null) {
+      return value;
+    }
+  }
+  return null;
+}
+
 function extractLineItemPrice(lineItem) {
   // --- Zero-Value Gatekeeper Rule ---
   // Prioritize net amount (after discounts) using nullish coalescing to catch 0
-  const directAmount =
-    lineItem?.total_money?.amount ??
-    lineItem?.total_price_money?.amount ??
-    lineItem?.line_total_money?.amount ??
-    lineItem?.total ??
-    lineItem?.total_price ??
-    lineItem?.line_total ??
-    lineItem?.amount ??
-    null;
+  const directAmount = pickMoneyValue(
+    lineItem?.total_money,
+    lineItem?.total_price_money,
+    lineItem?.line_total_money,
+    lineItem?.total,
+    lineItem?.total_price,
+    lineItem?.line_total,
+    lineItem?.amount
+  );
 
   if (directAmount !== null && directAmount !== undefined) {
     return normalizeMoney(directAmount);
   }
 
-  const grossAmount = 
-    lineItem?.gross_sales_money?.amount ??
-    lineItem?.subtotal_money?.amount ??
-    null;
+  const grossAmount = pickMoneyValue(
+    lineItem?.gross_total_money,
+    lineItem?.gross_sales_money,
+    lineItem?.subtotal_money,
+    lineItem?.total_before_discount_money,
+    lineItem?.total_before_discounts_money,
+    lineItem?.original_total_money
+  );
 
   if (grossAmount !== null && grossAmount !== undefined) {
     const gross = normalizeMoney(grossAmount);
-    const discount = normalizeMoney(
-      lineItem?.total_discount_money?.amount ?? 
-      lineItem?.discount_money?.amount ?? 
-      lineItem?.discount_amount ?? 
-      0
-    );
+    const discount = normalizeMoney(pickMoneyValue(
+      lineItem?.total_discount_money,
+      lineItem?.total_discounts_money,
+      lineItem?.discount_money,
+      lineItem?.discount_amount,
+      lineItem?.discount
+    ) ?? 0);
     return roundCurrency(gross - discount);
   }
 
-  const unitPrice =
-    lineItem?.price_money?.amount ??
-    lineItem?.unit_price_money?.amount ??
-    lineItem?.price ??
-    lineItem?.unit_price ??
-    0;
+  const unitPrice = pickMoneyValue(
+    lineItem?.price_money,
+    lineItem?.unit_price_money,
+    lineItem?.price,
+    lineItem?.unit_price
+  ) ?? 0;
 
   const qty = extractLineItemQty(lineItem);
   return roundCurrency(normalizeMoney(unitPrice) * qty);
+}
+
+function extractLineItemGrossPrice(lineItem) {
+  const grossAmount = pickMoneyValue(
+    lineItem?.gross_total_money,
+    lineItem?.gross_sales_money,
+    lineItem?.subtotal_money,
+    lineItem?.total_before_discount_money,
+    lineItem?.total_before_discounts_money,
+    lineItem?.original_total_money
+  );
+
+  if (grossAmount !== null && grossAmount !== undefined) {
+    return normalizeMoney(grossAmount);
+  }
+
+  const netAmount = pickMoneyValue(
+    lineItem?.total_money,
+    lineItem?.total_price_money,
+    lineItem?.line_total_money,
+    lineItem?.total,
+    lineItem?.total_price,
+    lineItem?.line_total,
+    lineItem?.amount
+  );
+
+  const lineDiscount = pickMoneyValue(
+    lineItem?.total_discount_money,
+    lineItem?.total_discounts_money,
+    lineItem?.discount_money,
+    lineItem?.discount_amount,
+    lineItem?.discount
+  );
+
+  if (netAmount !== null) {
+    return roundCurrency(normalizeMoney(netAmount) + normalizeMoney(lineDiscount ?? 0));
+  }
+
+  const unitPrice = pickMoneyValue(
+    lineItem?.price_money,
+    lineItem?.unit_price_money,
+    lineItem?.price,
+    lineItem?.unit_price
+  ) ?? 0;
+  const qty = extractLineItemQty(lineItem);
+  return roundCurrency(normalizeMoney(unitPrice) * qty);
+}
+
+function extractReceiptDiscountAmount(receipt) {
+  return Math.abs(normalizeMoney(pickMoneyValue(
+    receipt?.total_discounts_money,
+    receipt?.total_discount_money,
+    receipt?.total_discount,
+    receipt?.discount_money,
+    receipt?.discount_amount,
+    receipt?.discount
+  ) ?? 0));
 }
 
 function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
@@ -384,6 +482,8 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
   let totalGram = 0;
   let numeratorPrice = 0;
   let denominatorPrice = 0;
+  let mainGrossTotal = 0;
+  let fbGrossTotal = 0;
   let netSales = 0;
   let mainItemName = '';
 
@@ -398,7 +498,8 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       }
     }
     let normalizedCategory = category || 'uncategorized';
-    let itemTotal = extractLineItemPrice(lineItem);
+    const itemTotal = extractLineItemPrice(lineItem);
+    const itemGrossTotal = extractLineItemGrossPrice(lineItem);
     
     // Skip Price 0 items
     if (itemTotal <= 0.01) continue;
@@ -424,14 +525,17 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       // Group B: F&B
       // Action -> ညာဘက်မှာထားမယ်, Gram 0.000
       denominatorPrice += itemTotal;
+      fbGrossTotal += itemGrossTotal;
     } else if (isAcc) {
       // Group C: Real Accessories
       // Action -> ဘယ်ဘက်မှာထားမယ်, Gram 0.000
       numeratorPrice += itemTotal;
+      mainGrossTotal += itemGrossTotal;
     } else {
       // Group A: Main Flowers (ပန်းသီးသန့်)
       // Action -> ဘယ်ဘက်မှာထားမယ်, Gram ပေါင်းမယ်
       numeratorPrice += itemTotal;
+      mainGrossTotal += itemGrossTotal;
       
       // --- [NEW] Gram Exclusion Logic ---
       const isLobbyShirt = itemName.includes('the lobby shirt');
@@ -446,6 +550,85 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
     }
 
     netSales += itemTotal;
+  }
+
+  // Receipt-level discount fallback:
+  // If API did not fully push discounts down to line item totals, allocate the remainder.
+  // - If discount likely applies to whole receipt, split remainder proportionally (Main + F&B).
+  // - Otherwise, apply remainder to the side that already carries more line-level discount.
+  const receiptDiscount = extractReceiptDiscountAmount(receipt);
+  const mainLineDiscount = Math.max(0, roundCurrency(mainGrossTotal - numeratorPrice));
+  const fbLineDiscount = Math.max(0, roundCurrency(fbGrossTotal - denominatorPrice));
+  const knownLineDiscount = roundCurrency(mainLineDiscount + fbLineDiscount);
+  let remainingReceiptDiscount = roundCurrency(Math.max(0, receiptDiscount - knownLineDiscount));
+
+  if (remainingReceiptDiscount > 0.01) {
+    const hasBothSidesSales = numeratorPrice > 0.01 && denominatorPrice > 0.01;
+    const discountEntries = extractDiscountEntriesFromReceipt(receipt);
+    const receiptDiscountPercentage = pickPreferredDiscountPercentage(
+      discountEntries.map((entry) => entry?.percentage)
+    );
+
+    const likelyWholeReceiptDiscount = hasBothSidesSales && (
+      (mainLineDiscount <= 0.01 && fbLineDiscount <= 0.01) ||
+      (receiptDiscountPercentage !== null && receiptDiscountPercentage > 0 && receiptDiscountPercentage < 100)
+    );
+
+    if (likelyWholeReceiptDiscount) {
+      const splitBase = roundCurrency(numeratorPrice + denominatorPrice);
+      if (splitBase > 0.01) {
+        const mainShare = numeratorPrice / splitBase;
+        let mainDeduct = roundCurrency(Math.min(numeratorPrice, remainingReceiptDiscount * mainShare));
+        let fbDeduct = roundCurrency(Math.min(denominatorPrice, remainingReceiptDiscount - mainDeduct));
+        let remainderAfterSplit = roundCurrency(remainingReceiptDiscount - mainDeduct - fbDeduct);
+
+        if (remainderAfterSplit > 0.01) {
+          const mainCapacity = roundCurrency(numeratorPrice - mainDeduct);
+          const fbCapacity = roundCurrency(denominatorPrice - fbDeduct);
+
+          if (mainCapacity >= fbCapacity && mainCapacity > 0.01) {
+            const extra = Math.min(remainderAfterSplit, mainCapacity);
+            mainDeduct = roundCurrency(mainDeduct + extra);
+            remainderAfterSplit = roundCurrency(remainderAfterSplit - extra);
+          }
+
+          if (remainderAfterSplit > 0.01 && fbCapacity > 0.01) {
+            const extra = Math.min(remainderAfterSplit, fbCapacity);
+            fbDeduct = roundCurrency(fbDeduct + extra);
+            remainderAfterSplit = roundCurrency(remainderAfterSplit - extra);
+          }
+        }
+
+        numeratorPrice = roundCurrency(numeratorPrice - mainDeduct);
+        denominatorPrice = roundCurrency(denominatorPrice - fbDeduct);
+        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - mainDeduct - fbDeduct);
+      }
+    } else {
+      const prioritizeMain = mainLineDiscount >= fbLineDiscount;
+      if (prioritizeMain && numeratorPrice > 0.01) {
+        const mainDeduct = Math.min(remainingReceiptDiscount, numeratorPrice);
+        numeratorPrice = roundCurrency(numeratorPrice - mainDeduct);
+        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - mainDeduct);
+      } else if (!prioritizeMain && denominatorPrice > 0.01) {
+        const fbDeduct = Math.min(remainingReceiptDiscount, denominatorPrice);
+        denominatorPrice = roundCurrency(denominatorPrice - fbDeduct);
+        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - fbDeduct);
+      }
+
+      if (remainingReceiptDiscount > 0.01 && numeratorPrice > 0.01) {
+        const mainDeduct = Math.min(remainingReceiptDiscount, numeratorPrice);
+        numeratorPrice = roundCurrency(numeratorPrice - mainDeduct);
+        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - mainDeduct);
+      }
+
+      if (remainingReceiptDiscount > 0.01 && denominatorPrice > 0.01) {
+        const fbDeduct = Math.min(remainingReceiptDiscount, denominatorPrice);
+        denominatorPrice = roundCurrency(denominatorPrice - fbDeduct);
+        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - fbDeduct);
+      }
+    }
+
+    netSales = roundCurrency(numeratorPrice + denominatorPrice);
   }
 
   return {

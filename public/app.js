@@ -22,6 +22,9 @@ window.showMessage = function(message, type = 'info') {
 
 // --- EXPENSES LOGIC ---
 let currentNetSale = 0; 
+let activeSyncController = null;
+let activeSyncRequestId = 0;
+const SYNC_TIMEOUT_MS = 25000;
 
 function renderExpenses() {
   const date = document.getElementById('reportDate')?.value;
@@ -62,6 +65,10 @@ function round2(value) {
   return Number((value || 0).toFixed(2));
 }
 
+function round3(value) {
+  return Number((value || 0).toFixed(3));
+}
+
 function formatCurrency(value) {
   const amount = parseNumber(value);
   const formatted = new Intl.NumberFormat('en-US', {
@@ -69,6 +76,19 @@ function formatCurrency(value) {
     maximumFractionDigits: 2
   }).format(amount);
   return `THB ${formatted}`;
+}
+
+function formatCompactNumber(value) {
+  const amount = round2(parseNumber(value));
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2
+  }).format(amount);
+}
+
+function formatGramCompact(value) {
+  const amount = round3(parseNumber(value));
+  return `${amount.toFixed(3).replace(/\.?0+$/, '')}`;
 }
 
 function formatPercentage(value) {
@@ -181,7 +201,7 @@ function normalizeEntries(entries) {
 
 function renderEntryList(listElement, entries, options = {}) {
   if (!listElement) return;
-  const { showPercentage = false, percentageOnly = false, percentageFallbackText = 'N/A%' } = options;
+  const { showPercentage = false, percentageOnly = false, percentageFallbackText = 'N/A%', showGram = false } = options;
   
   listElement.innerHTML = '';
   if (!entries.length) {
@@ -194,40 +214,110 @@ function renderEntryList(listElement, entries, options = {}) {
 
   entries.forEach(entry => {
     const li = document.createElement('li');
-    let content = '';
     
     if (showPercentage) {
+      let content = '';
       if (entry.percentage !== null) {
         content = percentageOnly ? `${formatPercentage(entry.percentage)}` : `${formatPercentage(entry.percentage)} • ${formatCurrency(entry.amount)}`;
       } else {
         content = percentageOnly ? `${percentageFallbackText}` : `${formatCurrency(entry.amount)}`;
       }
+      li.textContent = content;
+      listElement.appendChild(li);
+      return;
     } else {
-      if (entry.mainAccTotal > 0 && entry.fbTotal > 0) {
-        content = `THB ${entry.mainAccTotal.toFixed(2)} / ${entry.fbTotal.toFixed(2)}`;
-      } else if (entry.fbTotal > 0 && entry.mainAccTotal <= 0) {
-        content = `F&B ${formatCurrency(entry.fbTotal)}`;
-      } else if (entry.mainAccTotal > 0 && entry.fbTotal <= 0) {
-        content = `${formatCurrency(entry.mainAccTotal)}`;
+      if (entry.mainAccTotal > 0 || entry.fbTotal > 0) {
+        const mainText = entry.mainAccTotal > 0 ? formatCompactNumber(entry.mainAccTotal) : '';
+        const fbText = entry.fbTotal > 0 ? formatCompactNumber(entry.fbTotal) : '-';
+        const splitText = `${mainText} / ${fbText}`;
+        if (showGram && entry.gramShare > 0) {
+          li.appendChild(document.createTextNode(`${splitText} `));
+          const gramBadge = document.createElement('span');
+          gramBadge.className = 'entry-gram-badge';
+          const gramValue = document.createElement('span');
+          gramValue.className = 'entry-gram-value';
+          gramValue.textContent = formatGramCompact(entry.gramShare);
+          const gramUnit = document.createElement('span');
+          gramUnit.className = 'entry-gram-unit';
+          gramUnit.textContent = 'G';
+          gramBadge.appendChild(gramValue);
+          gramBadge.append(' ');
+          gramBadge.appendChild(gramUnit);
+          li.appendChild(gramBadge);
+        } else {
+          li.textContent = splitText;
+        }
       } else {
-        content = `${formatCurrency(entry.amount)}`;
+        li.textContent = `${formatCurrency(entry.amount)}`;
       }
     }
-    
-    li.textContent = content;
     listElement.appendChild(li);
   });
 }
 
-function applyPaymentDetails(data) {
-  const cashEntries = normalizeEntries(data?.cash_entries || []);
-  const cardEntries = normalizeEntries(data?.card_entries || []);
-  const transferEntries = normalizeEntries(data?.transfer_entries || []);
+function sortEntriesByTimeAsc(entries) {
+  return [...entries].sort((a, b) => {
+    const aTime = a?.time ? new Date(a.time).getTime() : Number.POSITIVE_INFINITY;
+    const bTime = b?.time ? new Date(b.time).getTime() : Number.POSITIVE_INFINITY;
+    return aTime - bTime;
+  });
+}
+
+function buildReceiptGramMap(orderEntries) {
+  const receiptGramMap = new Map();
+  if (!Array.isArray(orderEntries)) return receiptGramMap;
+
+  orderEntries.forEach((entry) => {
+    const receiptKey = String(entry?.receipt || '').trim();
+    const grams = round3(parseNumber(entry?.grams));
+    if (receiptKey && grams > 0.001) {
+      receiptGramMap.set(receiptKey, grams);
+    }
+  });
+
+  return receiptGramMap;
+}
+
+function attachGramShare(entries, receiptGramMap) {
+  if (!(receiptGramMap instanceof Map) || receiptGramMap.size === 0) {
+    return entries.map((entry) => ({ ...entry, gramShare: 0 }));
+  }
+
+  const receiptAmountTotals = new Map();
+  entries.forEach((entry) => {
+    const receiptKey = String(entry?.receiptNumber || '').trim();
+    if (!receiptKey) return;
+    const nextTotal = parseNumber(receiptAmountTotals.get(receiptKey)) + parseNumber(entry.amount);
+    receiptAmountTotals.set(receiptKey, round2(nextTotal));
+  });
+
+  return entries.map((entry) => {
+    const receiptKey = String(entry?.receiptNumber || '').trim();
+    const receiptGrams = round3(parseNumber(receiptGramMap.get(receiptKey)));
+    if (!receiptKey || receiptGrams <= 0.001) {
+      return { ...entry, gramShare: 0 };
+    }
+
+    const entryAmount = round2(parseNumber(entry.amount));
+    const receiptAmount = round2(parseNumber(receiptAmountTotals.get(receiptKey)));
+    if (receiptAmount <= 0 || entryAmount <= 0) {
+      return { ...entry, gramShare: 0 };
+    }
+
+    const gramShare = round3(receiptGrams * (entryAmount / receiptAmount));
+    return { ...entry, gramShare };
+  });
+}
+
+function applyPaymentDetails(data, receiptGramMap = new Map()) {
+  const cashEntries = attachGramShare(sortEntriesByTimeAsc(normalizeEntries(data?.cash_entries || [])), receiptGramMap);
+  const cardEntries = attachGramShare(sortEntriesByTimeAsc(normalizeEntries(data?.card_entries || [])), receiptGramMap);
+  const transferEntries = attachGramShare(sortEntriesByTimeAsc(normalizeEntries(data?.transfer_entries || [])), receiptGramMap);
   const discountEntries = normalizeEntries(Array.isArray(data?.discount_entry_details) && data.discount_entry_details.length ? data.discount_entry_details : data?.discount_entries || []);
 
-  renderEntryList(els.cashEntriesList, cashEntries);
-  renderEntryList(els.cardEntriesList, cardEntries);
-  renderEntryList(els.transferEntriesList, transferEntries);
+  renderEntryList(els.cashEntriesList, cashEntries, { showGram: true });
+  renderEntryList(els.cardEntriesList, cardEntries, { showGram: true });
+  renderEntryList(els.transferEntriesList, transferEntries, { showGram: true });
   renderEntryList(els.discountEntriesList, discountEntries, { showPercentage: true, percentageOnly: true });
 
   const cashTotal = cashEntries.reduce((s, e) => s + e.amount, 0);
@@ -254,7 +344,8 @@ function processOrdersData(data) {
     let orderLineGram = 0;
     let mainAndAccPrice = 0;
     let fbPriceTotal = 0;
-    let mainItemName = "";
+    const receiptNumber = order.receipt_number || order.number;
+    const receiptTime = order.created_at;
 
     const items = order?.line_items || order?.items || [];
     const orderTotalMoney = Number(order?.total_money || 0);
@@ -264,24 +355,40 @@ function processOrdersData(data) {
     items.forEach(item => {
       let itemName = String(item?.name || item?.item_name || "").toLowerCase();
       let category = String(item?.category_name || "").toLowerCase();
+      const qtyRaw = Number(item?.quantity ?? item?.qty ?? 0);
       
       // --- Zero-Value Gatekeeper Rule ---
-      let grossPrice = Number(item?.gross_total_money ?? item?.total_money ?? (Number(item?.price ?? 0) * Number(item?.quantity ?? item?.qty ?? 0)));
+      const lineNetRaw = item?.total_money?.amount ?? item?.total_money;
+      const hasLineNetPrice = lineNetRaw !== undefined && lineNetRaw !== null;
+      const grossRaw = item?.gross_total_money?.amount ?? item?.gross_total_money;
+      let grossPrice = Number(grossRaw);
+      if (!Number.isFinite(grossPrice)) {
+        grossPrice = Number(lineNetRaw);
+      }
+      if (!Number.isFinite(grossPrice)) {
+        grossPrice = Number(item?.price ?? 0) * qtyRaw;
+      }
+      if (!Number.isFinite(grossPrice)) {
+        grossPrice = 0;
+      }
       
       // Calculate item-level net price (after line-item discounts)
-      let lineItemNetPrice = Number(item?.total_money ?? item?.total_money?.amount ?? 0);
-      if (lineItemNetPrice === 0 && grossPrice > 0) {
+      let lineItemNetPrice = Number(lineNetRaw ?? 0);
+      if (!Number.isFinite(lineItemNetPrice)) {
+        lineItemNetPrice = 0;
+      }
+      if (!hasLineNetPrice && grossPrice > 0) {
         lineItemNetPrice = grossPrice - Number(item?.total_discount_money?.amount ?? item?.total_discount_money ?? item?.discount_money?.amount ?? item?.discount_money ?? 0);
       }
 
       let itemNetPrice = lineItemNetPrice;
-      if (hasOrderDiscount && orderTotalMoney > 0 && lineItemNetPrice > 0) {
+      if (!hasLineNetPrice && hasOrderDiscount && orderTotalMoney > 0 && lineItemNetPrice > 0) {
         itemNetPrice = lineItemNetPrice - (lineItemNetPrice / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
       }
 
       if (itemNetPrice <= 0.01) return;
 
-      let qty = Number(item?.quantity ?? item?.qty ?? 0);
+      let qty = qtyRaw;
       if (itemName.includes('lemon cherry') && grossPrice >= 4970) {
         qty = 7;
       }
@@ -304,17 +411,20 @@ function processOrdersData(data) {
 
       const accessoryKeywords = [
         'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
-        'shirt', 'hat', 'lighter', 'the lobby', 'merch'
+        'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray',
+        'pipe', 'small pipe', 'best buds grinder', 'best buds shirt',
+        'nf best buds shirt', 'sw best buds shirt'
       ];
 
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
+      let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
       
-      let isFB = !isFlowerStrain && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+      let isFB = !isFlowerStrain && !isThcGummy && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
 
       // Fallback to price if not clearly classified by name
-      if (!isFlowerStrain && !isFB) {
+      if (!isFlowerStrain && !isFB && !isAccessory) {
         const unitPrice = grossPrice / (qty || 1);
         if (unitPrice <= 50 && unitPrice > 0) {
           isFB = true;
@@ -331,22 +441,26 @@ function processOrdersData(data) {
         fbPriceTotal += itemNetPrice;
       } else {
         mainAndAccPrice += itemNetPrice;
-        if (isFlowerStrain && !isThcGummy) {
+        if (isFlowerStrain && !isThcGummy && !isAccessory) {
           orderLineGram += qty;
         }
       }
 
       detailedItems.push({
-        gram: (isFlowerStrain && !isThcGummy) ? `${qty.toFixed(3)} G` : '',
+        receipt: receiptNumber,
+        time: receiptTime,
+        gram: (isFlowerStrain && !isThcGummy && !isAccessory) ? `${qty.toFixed(3)} G` : '',
         itemName: item.name || item.item_name,
         price: itemNetPrice,
-        isFB: isFB
+        isFB: isFB,
+        mainPrice: isFB ? 0 : itemNetPrice,
+        fbPrice: isFB ? itemNetPrice : 0
       });
     });
 
     orderEntries.push({
-      time: order.created_at,
-      receipt: order.receipt_number || order.number,
+      time: receiptTime,
+      receipt: receiptNumber,
       grams: orderLineGram,
       mainAndAccPrice: mainAndAccPrice,
       fbPrice: fbPriceTotal
@@ -393,17 +507,20 @@ function processAutomatedReportRows(data) {
 
       const accessoryKeywords = [
         'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
-        'shirt', 'hat', 'lighter', 'the lobby', 'merch'
+        'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray',
+        'pipe', 'small pipe', 'best buds grinder', 'best buds shirt',
+        'nf best buds shirt', 'sw best buds shirt'
       ];
 
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
+      let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
       
-      let isFB = !isFlowerStrain && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+      let isFB = !isFlowerStrain && !isThcGummy && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
 
       // Fallback to price if not clearly classified by name
-      if (!isFlowerStrain && !isFB) {
+      if (!isFlowerStrain && !isFB && !isAccessory) {
         const unitPrice = price / (qty || 1);
         if (unitPrice <= 50 && unitPrice > 0) {
           isFB = true;
@@ -420,16 +537,20 @@ function processAutomatedReportRows(data) {
         fbPriceTotal += price;
       } else {
         mainAndAccPrice += price;
-        if (isFlowerStrain && !isThcGummy) {
+        if (isFlowerStrain && !isThcGummy && !isAccessory) {
           orderLineGram += qty;
         }
       }
 
       detailedItems.push({
-        gram: (isFlowerStrain && !isThcGummy) ? `${qty.toFixed(3)} G` : '',
+        receipt: row.receipt_number,
+        time: row.time,
+        gram: (isFlowerStrain && !isThcGummy && !isAccessory) ? `${qty.toFixed(3)} G` : '',
         itemName: item.item_name,
         price: price,
-        isFB: isFB
+        isFB: isFB,
+        mainPrice: isFB ? 0 : price,
+        fbPrice: isFB ? price : 0
       });
     });
 
@@ -455,16 +576,32 @@ async function syncFromLoyverse() {
   const syncBtn = document.getElementById('syncButton');
   const date = dateInput?.value;
   const staffName = staffInput?.value || '';
+  const requestId = ++activeSyncRequestId;
 
   if (!date) {
     window.showMessage('Please select a date first', 'warning');
     return;
   }
 
+  if (activeSyncController) {
+    activeSyncController.abort();
+  }
+  const syncController = new AbortController();
+  activeSyncController = syncController;
+  const timeoutId = setTimeout(() => {
+    syncController.abort();
+  }, SYNC_TIMEOUT_MS);
+
   setButtonLoading(syncBtn, 'Syncing...', true);
   try {
-    const res = await fetch(`/api/loyverse/sync?date=${date}`, { cache: 'no-store' });
-    const data = await res.json();
+    const res = await fetch(`/api/loyverse/sync?date=${date}`, {
+      cache: 'no-store',
+      signal: syncController.signal
+    });
+    const data = await res.json().catch(() => ({}));
+    if (requestId !== activeSyncRequestId) {
+      return;
+    }
     console.log("Received Payload:", data);
 
     
@@ -478,27 +615,27 @@ async function syncFromLoyverse() {
     // Set Net Sale for Expense calculation
     currentNetSale = round2(data?.net_sale || 0);
     
-    // Apply payment details
-    applyPaymentDetails(data);
-    
     // Process and render order data
     let totalGramsCalculated = 0;
+    let receiptGramMap = new Map();
     // Use raw orders if available, otherwise fallback to automated_report_rows
     if (Array.isArray(data?.orders) && data.orders.length > 0) {
       const result = processOrdersData(data);
       totalGramsCalculated = result.totalGrams;
-      renderOrderEntriesTable(result.orderEntries);
-      renderDetailedSalesTable(result.detailedItems, result.totalGrams);
+      receiptGramMap = buildReceiptGramMap(result.orderEntries);
+      renderOrderEntriesTable(result.orderEntries, result.detailedItems);
     } else if (Array.isArray(data?.automated_report_rows) && data.automated_report_rows.length > 0) {
       // Fallback: use pre-processed automated_report_rows from backend
       const fallbackResult = processAutomatedReportRows(data);
       totalGramsCalculated = fallbackResult.totalGrams;
-      renderOrderEntriesTable(fallbackResult.orderEntries);
-      renderDetailedSalesTable(fallbackResult.detailedItems, fallbackResult.totalGrams);
+      receiptGramMap = buildReceiptGramMap(fallbackResult.orderEntries);
+      renderOrderEntriesTable(fallbackResult.orderEntries, fallbackResult.detailedItems);
     } else {
       renderOrderEntriesTable([]);
-      renderDetailedSalesTable([], 0);
     }
+
+    // Apply payment details after gram map is built from order entries
+    applyPaymentDetails(data, receiptGramMap);
     
     // Update summary totals
     if (els.cashTotal) els.cashTotal.value = round2(data?.cash_total || 0).toFixed(2);
@@ -506,6 +643,14 @@ async function syncFromLoyverse() {
     if (els.transferTotal) els.transferTotal.value = round2(data?.transfer_total || 0).toFixed(2);
     if (els.netSale) els.netSale.value = currentNetSale.toFixed(2);
     if (els.totalOrders) els.totalOrders.value = data?.total_orders || 0;
+    if (els.orderEntriesFbTotal) {
+      const fbTotalFromPayments = [
+        ...(data?.cash_entries || []),
+        ...(data?.card_entries || []),
+        ...(data?.transfer_entries || [])
+      ].reduce((sum, entry) => sum + parseNumber(entry?.fb_total), 0);
+      els.orderEntriesFbTotal.textContent = formatCurrency(fbTotalFromPayments);
+    }
     
     // Use the totalGrams calculated during processing
     if (els.totalGramsSold) els.totalGramsSold.innerText = totalGramsCalculated.toFixed(3) + ' G';
@@ -514,11 +659,22 @@ async function syncFromLoyverse() {
     renderExpenses();
     
   } catch (e) { 
+    if (requestId !== activeSyncRequestId) {
+      return;
+    }
+    if (e?.name === 'AbortError') {
+      window.showMessage('Sync timed out. Please try again.', 'warning');
+      return;
+    }
     console.error('Sync Error:', e);
     window.showMessage(`Sync Error: ${e.message}`, 'danger');
   }
   finally { 
-    setButtonLoading(syncBtn, '', false); 
+    clearTimeout(timeoutId);
+    if (requestId === activeSyncRequestId) {
+      activeSyncController = null;
+      setButtonLoading(syncBtn, '', false);
+    }
   }
 }
 
@@ -533,56 +689,92 @@ function setButtonLoading(button, text, isLoading) {
   }
 }
 
-function renderOrderEntriesTable(orderEntries) {
+function sortOrderEntriesByTimeAsc(entries) {
+  return [...entries].sort((a, b) => {
+    const aTime = a?.time ? new Date(a.time).getTime() : Number.POSITIVE_INFINITY;
+    const bTime = b?.time ? new Date(b.time).getTime() : Number.POSITIVE_INFINITY;
+    return aTime - bTime;
+  });
+}
+
+function renderOrderEntriesTable(orderEntries, detailedItems = []) {
   const container = document.getElementById('orderEntriesBody');
   if (!container) return;
 
   if (!orderEntries || orderEntries.length === 0) {
-    container.innerHTML = '<tr><td colspan="4" class="text-center">No orders found</td></tr>';
+    container.innerHTML = '<tr><td colspan="6" class="text-center">No orders found</td></tr>';
     return;
   }
 
+  const detailsByReceipt = new Map();
+  detailedItems.forEach((item) => {
+    const receiptKey = String(item?.receipt || '').trim();
+    if (!receiptKey) return;
+    if (!detailsByReceipt.has(receiptKey)) {
+      detailsByReceipt.set(receiptKey, []);
+    }
+    detailsByReceipt.get(receiptKey).push(item);
+  });
+
+  const sortedOrderEntries = sortOrderEntriesByTimeAsc(orderEntries);
   let html = '';
-  orderEntries.forEach(entry => {
+  sortedOrderEntries.forEach(entry => {
     const time = new Date(entry.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const receiptKey = String(entry?.receipt || '').trim();
+    const detailRows = detailsByReceipt.get(receiptKey) || [];
+    const grams = parseNumber(entry?.grams);
+    const mainTotal = parseNumber(entry?.mainAndAccPrice);
+    const fbTotal = parseNumber(entry?.fbPrice);
+    const hasNonZeroSummary = grams > 0.001 || mainTotal > 0.01 || fbTotal > 0.01;
+    const hasNonZeroDetails = detailRows.some((item) => (
+      parseNumber(item?.mainPrice) > 0.01 ||
+      parseNumber(item?.fbPrice) > 0.01 ||
+      parseNumber(item?.price) > 0.01
+    ));
+    if (!hasNonZeroSummary && !hasNonZeroDetails) {
+      return;
+    }
+
     html += `
-      <tr>
+      <tr class="table-light fw-semibold">
         <td>${time}</td>
         <td>${entry.receipt}</td>
         <td>${entry.grams.toFixed(3)} G</td>
-        <td class="text-end">${entry.mainAndAccPrice.toLocaleString()} / ${entry.fbPrice.toLocaleString()}</td>
+        <td><span class="receipt-summary-label">Main/F&amp;B Total</span></td>
+        <td class="text-end">${formatCompactNumber(entry.mainAndAccPrice)}</td>
+        <td class="text-end">${formatCompactNumber(entry.fbPrice)}</td>
       </tr>
     `;
+
+    detailRows.forEach((item) => {
+      const itemGram = item.gram || '-';
+      const mainValue = item.mainPrice > 0 ? formatCompactNumber(item.mainPrice) : '-';
+      const fbValue = item.fbPrice > 0 ? formatCompactNumber(item.fbPrice) : '-';
+      html += `
+        <tr>
+          <td></td>
+          <td></td>
+          <td>${itemGram}</td>
+          <td>${item.itemName || '-'}</td>
+          <td class="text-end">${mainValue}</td>
+          <td class="text-end">${fbValue}</td>
+        </tr>
+      `;
+    });
   });
-  container.innerHTML = html;
-}
-
-function renderDetailedSalesTable(detailedItems, totalGrams) {
-  const container = document.getElementById('bestBudsSalesBody');
-  if (!container) return;
-
-  if (!detailedItems || detailedItems.length === 0) {
-    container.innerHTML = '<tr><td colspan="3" class="text-center">No detailed sales found</td></tr>';
-    return;
-  }
-
-  let html = '';
-  detailedItems.forEach(item => {
-    html += `
-      <tr>
-        <td>${item.gram}</td>
-        <td>${item.itemName}</td>
-        <td class="text-end">${item.price.toLocaleString()}</td>
-      </tr>
-    `;
-  });
-  container.innerHTML = html;
+  container.innerHTML = html || '<tr><td colspan="6" class="text-center">No orders found</td></tr>';
 }
 
 function bindEvents() {
   const reportDateInput = document.getElementById('reportDate');
   if (reportDateInput) {
-    reportDateInput.addEventListener('change', syncFromLoyverse);
+    reportDateInput.addEventListener('change', () => {
+      const monthInput = document.getElementById('reportMonth');
+      if (monthInput && reportDateInput.value) {
+        monthInput.value = reportDateInput.value.slice(0, 7);
+      }
+      syncFromLoyverse();
+    });
   }
   const syncButton = document.getElementById('syncButton');
   if (syncButton) {
@@ -615,6 +807,7 @@ const els = {
   netSale: document.getElementById('netSale'),
   totalOrders: document.getElementById('totalOrders'),
   totalGramsSold: document.getElementById('totalGramsSold'),
+  orderEntriesFbTotal: document.getElementById('orderEntriesFbTotal'),
   cashEntriesTotal: document.getElementById('cashEntriesTotal'),
   cardEntriesTotal: document.getElementById('cardEntriesTotal'),
   transferEntriesTotal: document.getElementById('transferEntriesTotal'),
@@ -630,6 +823,10 @@ function init() {
   if (reportDateInput) {
     reportDateInput.value = todayLocalDate();
   }
+  const reportMonthInput = document.getElementById('reportMonth');
+  if (reportMonthInput) {
+    reportMonthInput.value = todayLocalDate().slice(0, 7);
+  }
   
   // Refresh els references in case they weren't in DOM yet
   els.cashTotal = document.getElementById('cashTotal');
@@ -638,6 +835,7 @@ function init() {
   els.netSale = document.getElementById('netSale');
   els.totalOrders = document.getElementById('totalOrders');
   els.totalGramsSold = document.getElementById('totalGramsSold');
+  els.orderEntriesFbTotal = document.getElementById('orderEntriesFbTotal');
   els.cashEntriesTotal = document.getElementById('cashEntriesTotal');
   els.cardEntriesTotal = document.getElementById('cardEntriesTotal');
   els.transferEntriesTotal = document.getElementById('transferEntriesTotal');

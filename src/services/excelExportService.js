@@ -33,6 +33,33 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
   ];
 
   const fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju'];
+  const accessoryKeywords = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray', 'pipe', 'small pipe', 'best buds grinder', 'best buds shirt', 'nf best buds shirt', 'sw best buds shirt'];
+
+  function toMoneyNumber(value) {
+    if (value === null || value === undefined) return null;
+    if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+    if (typeof value === 'string') {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+    if (typeof value === 'object') {
+      if (Object.prototype.hasOwnProperty.call(value, 'amount')) {
+        return toMoneyNumber(value.amount);
+      }
+      if (Object.prototype.hasOwnProperty.call(value, 'value')) {
+        return toMoneyNumber(value.value);
+      }
+    }
+    return null;
+  }
+
+  function getMoney(...candidates) {
+    for (const candidate of candidates) {
+      const amount = toMoneyNumber(candidate);
+      if (amount !== null) return amount;
+    }
+    return null;
+  }
 
   const flowerItems = [];
   const fbItems = [];
@@ -44,8 +71,20 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
                            (receipt.payments && receipt.payments[0]?.name) || 'N/A';
     const receiptNumber = receipt.receipt_number || receipt.number || 'N/A';
     
-    const orderDiscount = parseFloat(receipt.total_discount_money?.amount || 0);
-    const orderTotal = parseFloat(receipt.total_money?.amount || 0);
+    const orderDiscount = getMoney(
+      receipt.total_discount_money,
+      receipt.total_discounts_money,
+      receipt.total_discount,
+      receipt.discount_money,
+      receipt.discount_amount,
+      receipt.discount
+    ) || 0;
+    const orderTotal = getMoney(
+      receipt.total_money,
+      receipt.total_price_money,
+      receipt.amount_money,
+      receipt.amount
+    ) || 0;
     const hasOrderDiscount = orderDiscount > 0;
 
     items.forEach(item => {
@@ -53,11 +92,45 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
       let category = String(item.category_name || "").toLowerCase();
       let qty = Number(item.quantity || item.qty || 0);
       
-      let grossPrice = Number(item.gross_total_money?.amount ?? item.total_money?.amount ?? 0);
-      const lineItemDiscount = parseFloat(item.total_discount_money?.amount || item.discount_money?.amount || item.discount_amount || 0);
-      let itemNetPrice = item.total_money?.amount !== undefined ? parseFloat(item.total_money.amount) : (grossPrice - lineItemDiscount);
+      let grossPrice = getMoney(
+        item.gross_total_money,
+        item.subtotal_money,
+        item.total_before_discount_money,
+        item.total_before_discounts_money,
+        item.original_total_money
+      );
+      const lineItemDiscount = getMoney(
+        item.total_discount_money,
+        item.total_discounts_money,
+        item.discount_money,
+        item.discount_amount,
+        item.discount
+      ) || 0;
+      const explicitNetPrice = getMoney(
+        item.total_money,
+        item.total_price_money,
+        item.line_total_money
+      );
+
+      if (grossPrice === null) {
+        const unitPrice = getMoney(item.price_money, item.unit_price_money, item.price, item.unit_price);
+        if (unitPrice !== null && qty > 0) {
+          grossPrice = unitPrice * qty;
+        }
+      }
+
+      if (grossPrice === null && explicitNetPrice !== null) {
+        grossPrice = explicitNetPrice + lineItemDiscount;
+      }
+
+      if (grossPrice === null) {
+        grossPrice = 0;
+      }
+
+      const hasExplicitLineNet = explicitNetPrice !== null;
+      let itemNetPrice = hasExplicitLineNet ? explicitNetPrice : Math.max(0, grossPrice - lineItemDiscount);
       
-      if (hasOrderDiscount && orderTotal > 0 && itemNetPrice > 0) {
+      if (!hasExplicitLineNet && hasOrderDiscount && orderTotal > 0 && itemNetPrice > 0) {
         let allocatedOrderDiscount = (itemNetPrice / (orderTotal + orderDiscount)) * orderDiscount;
         itemNetPrice = Math.max(0, itemNetPrice - allocatedOrderDiscount);
       }
@@ -65,22 +138,24 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
       // Rule: Skip Price 0 items entirely
       if (itemNetPrice <= 0.01) return;
 
-      const totalItemDiscount = grossPrice - itemNetPrice;
+      const totalItemDiscount = Math.max(0, grossPrice - itemNetPrice);
       const discountPercent = grossPrice > 0 ? (totalItemDiscount / grossPrice * 100) : 0;
       const discountStr = totalItemDiscount > 0.01 ? `${discountPercent.toFixed(0)}% (${totalItemDiscount.toFixed(2)} THB)` : '-';
 
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
       let isLobbyShirt = itemName.includes('the lobby shirt');
+      let isAccessory = accessoryKeywords.some(k => itemName.includes(k) || category.includes(k));
 
-      let isFB = !isFlowerStrain && (
+      let isFB = !isFlowerStrain && !isAccessory && (
         fbKeywords.some(k => itemName.includes(k) || category.includes(k)) ||
         (['tea'].some(k => itemName.includes(k) || category.includes(k)) && !itemName.includes('tea time')) ||
         (grossPrice / (qty || 1)) <= 50
       );
 
+      const exportType = isFB ? 'F&B' : (isAccessory ? 'Accessories' : 'Flower/Main');
       const exportItem = {
-        type: isFB ? 'F&B' : 'Flower/Main',
+        type: exportType,
         name: item.name || item.item_name,
         qty: qty,
         unitPrice: grossPrice / (qty || 1),
@@ -94,7 +169,7 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
         fbItems.push(exportItem);
       } else {
         flowerItems.push(exportItem);
-        if (!isThcGummy && !isLobbyShirt) {
+        if (!isThcGummy && !isLobbyShirt && !isAccessory) {
           totalFlowerGrams += qty;
         }
       }

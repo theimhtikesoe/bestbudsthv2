@@ -11,7 +11,7 @@ const MAIN_KEYWORDS = [
   'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
   'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
   'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-  'free pina colada', 'flower', 'bud', 'pre-roll', 'joint'
+  'free pina colada', 'thc gummy', 'flower', 'bud', 'pre-roll', 'joint'
 ];
 
 const FB_KEYWORDS = [
@@ -22,7 +22,9 @@ const FB_KEYWORDS = [
 
 const ACCESSORY_KEYWORDS = [
   'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
-  'shirt', 'hat', 'lighter', 'the lobby', 'merch'
+  'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray',
+  'pipe', 'small pipe', 'best buds grinder', 'best buds shirt',
+  'nf best buds shirt', 'sw best buds shirt'
 ];
 
 /**
@@ -36,14 +38,19 @@ function classifyItem(itemName, categoryName = '', unitPrice = 0) {
   const name = String(itemName || '').toLowerCase();
   const cat = String(categoryName || '').toLowerCase();
 
-  // 1. Check for Main/Flower keywords first (as requested: Flower = Main)
+  // 1. Check for Accessories first so items like "Best buds hat" don't get caught by "bud"
+  if (ACCESSORY_KEYWORDS.some(keyword => name.includes(keyword)) ||
+      cat.includes('accessories') ||
+      cat.includes('merchandise')) {
+    return 'accessory';
+  }
+
+  // 2. Check for Main/Flower keywords
   if (MAIN_KEYWORDS.some(keyword => name.includes(keyword))) {
-    // Special case: 'tea time' is a flower, but 'tea' is F&B. 
-    // Since we check MAIN_KEYWORDS first, 'tea time' will be 'main'.
     return 'main';
   }
 
-  // 2. Check for F&B keywords
+  // 3. Check for F&B keywords
   if (FB_KEYWORDS.some(keyword => name.includes(keyword)) || 
       cat.includes('soft drink') || 
       cat.includes('snacks') || 
@@ -58,14 +65,7 @@ function classifyItem(itemName, categoryName = '', unitPrice = 0) {
     return 'fb';
   }
 
-  // 3. Check for Accessories
-  if (ACCESSORY_KEYWORDS.some(keyword => name.includes(keyword)) || 
-      cat.includes('accessories') || 
-      cat.includes('merchandise')) {
-    return 'accessory';
-  }
-
-  // 4. Fallback to price if name doesn't match anything (keeping original logic as safety)
+  // 4. Fallback to price if name doesn't match anything
   if (unitPrice > 50) {
     return 'main';
   } else if (unitPrice > 0) {
