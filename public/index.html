@@ -105,6 +105,50 @@
           </div>
         </div>
 
+        <h2 class="h5 mt-4 mb-3">Order Payment Details</h2>
+        <div class="row g-3 payment-details-row">
+          <div class="col-md-3">
+            <div class="detail-box payment-detail-box">
+              <div class="detail-box-head">
+                <span>Cash Entries</span>
+                <strong id="cashEntriesTotal" class="payment-total">THB 0.00</strong>
+              </div>
+              <ul id="cashEntriesList" class="detail-list mb-0"></ul>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="detail-box payment-detail-box">
+              <div class="detail-box-head">
+                <span>Transfer Entries</span>
+                <strong id="transferEntriesTotal" class="payment-total">THB 0.00</strong>
+              </div>
+              <ul id="transferEntriesList" class="detail-list mb-0"></ul>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="detail-box payment-detail-box">
+              <div class="detail-box-head">
+                <span>Card Entries</span>
+                <strong id="cardEntriesTotal" class="payment-total">THB 0.00</strong>
+              </div>
+              <ul id="cardEntriesList" class="detail-list mb-0"></ul>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="detail-box payment-detail-box">
+              <div class="detail-box-head">
+                <span>Discount Entries</span>
+                <strong id="discountEntriesTotal" class="payment-total">THB 0.00</strong>
+              </div>
+              <ul id="discountEntriesList" class="detail-list mb-0"></ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap align-items-center gap-3 mt-4">
+          <span id="unclassifiedHint" class="text-muted small"></span>
+        </div>
+
         <!-- Closing Staff Section -->
         <div id="closingStaffSection" class="mt-4">
           <h2 class="h5 mb-3">Closing Staff</h2>
@@ -156,52 +200,8 @@
           </div>
         </div>
 
-        <h2 class="h5 mt-4 mb-3">Order Payment Details</h2>
-        <div class="row g-3 payment-details-row">
-          <div class="col-md-3">
-            <div class="detail-box payment-detail-box">
-              <div class="detail-box-head">
-                <span>Cash Entries</span>
-                <strong id="cashEntriesTotal" class="payment-total">THB 0.00</strong>
-              </div>
-              <ul id="cashEntriesList" class="detail-list mb-0"></ul>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="detail-box payment-detail-box">
-              <div class="detail-box-head">
-                <span>Transfer Entries</span>
-                <strong id="transferEntriesTotal" class="payment-total">THB 0.00</strong>
-              </div>
-              <ul id="transferEntriesList" class="detail-list mb-0"></ul>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="detail-box payment-detail-box">
-              <div class="detail-box-head">
-                <span>Card Entries</span>
-                <strong id="cardEntriesTotal" class="payment-total">THB 0.00</strong>
-              </div>
-              <ul id="cardEntriesList" class="detail-list mb-0"></ul>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="detail-box payment-detail-box">
-              <div class="detail-box-head">
-                <span>Discount Entries</span>
-                <strong id="discountEntriesTotal" class="payment-total">THB 0.00</strong>
-              </div>
-              <ul id="discountEntriesList" class="detail-list mb-0"></ul>
-            </div>
-          </div>
-        </div>
-
-        <div class="d-flex flex-wrap align-items-center gap-3 mt-4">
-          <span id="unclassifiedHint" class="text-muted small"></span>
-        </div>
-
         <div class="row g-3 mt-2">
-          <div class="col-md-3 col-sm-6">
+          <div class="col-md-2 offset-md-8 col-sm-6">
             <div class="gram-stat-card">
               <span class="gram-stat-label">F&B Total</span>
               <strong id="orderEntriesFbTotal" class="gram-stat-value">THB 0.00</strong>
