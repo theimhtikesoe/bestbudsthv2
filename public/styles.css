@@ -285,6 +285,10 @@ body {
   width: 100%;
 }
 
+.expense-export-actions .btn {
+  min-height: 42px;
+}
+
 .detail-box {
   border: 1px solid #3a3020;
   border-radius: 0.75rem;
@@ -540,6 +544,10 @@ body {
   }
 
   .action-btn-row .btn {
+    min-height: 40px;
+  }
+
+  .expense-export-actions .btn {
     min-height: 40px;
   }
 }

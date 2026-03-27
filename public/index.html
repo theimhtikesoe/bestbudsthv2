@@ -32,7 +32,7 @@
     integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
     crossorigin="anonymous"
   />
-  <link rel="stylesheet" href="styles.css?v=20260326d" />
+  <link rel="stylesheet" href="styles.css?v=20260327a" />
 </head>
 <body>
   <header class="app-header py-4 mb-4">
@@ -63,22 +63,16 @@
     <section id="reportSection" class="card shadow-sm mb-4">
       <div class="card-body">
         <div class="row g-3 align-items-end mb-3 action-btn-row">
-          <div class="col-lg-3 col-md-6">
+          <div class="col-lg-4 col-md-6">
             <label for="reportDate" class="form-label">Report Date</label>
             <input id="reportDate" type="date" class="form-control" />
           </div>
-          <div class="col-lg-3 col-md-6">
+          <div class="col-lg-4 col-md-6">
             <label for="reportMonth" class="form-label">Report Month</label>
             <input id="reportMonth" type="month" class="form-control" />
           </div>
-          <div class="col-lg-2 col-md-4 d-grid">
+          <div class="col-lg-4 col-md-12 d-grid">
             <button id="syncButton" class="btn btn-primary no-export">Sync From Loyverse</button>
-          </div>
-          <div class="col-lg-2 col-md-4 d-grid">
-            <button id="exportCsvBtn" onclick="exportReportToExcel()" class="btn btn-success fw-bold">📥 Export Daily Excel</button>
-          </div>
-          <div class="col-lg-2 col-md-4 d-grid">
-            <button id="exportMonthlyBtn" onclick="exportMonthlyToExcel()" class="btn btn-warning fw-bold no-export">📦 Export Monthly Excel</button>
           </div>
         </div>
 
@@ -208,6 +202,14 @@
                 </div>
               </div>
               <div id="expensesList" class="mt-3"></div>
+            </div>
+            <div class="row g-2 mt-3 expense-export-actions">
+              <div class="col-md-6 d-grid">
+                <button id="exportCsvBtn" onclick="exportReportToExcel()" class="btn btn-success fw-bold">📥 Export Daily Excel</button>
+              </div>
+              <div class="col-md-6 d-grid">
+                <button id="exportMonthlyBtn" onclick="exportMonthlyToExcel()" class="btn btn-warning fw-bold no-export">📦 Export Monthly Excel</button>
+              </div>
             </div>
           </div>
         </div>
