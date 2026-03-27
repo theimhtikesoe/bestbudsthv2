@@ -71,12 +71,6 @@
             <label for="reportMonth" class="form-label">Report Month</label>
             <input id="reportMonth" type="month" class="form-control" />
           </div>
-          <div class="flex-grow-1">
-            <label for="closingStaff" class="form-label">Closing Staff</label>
-            <input id="closingStaff" type="text" class="form-control" placeholder="Enter name" />
-          </div>
-
-          <button id="addClosingStaffBtn" onclick="addClosingStaffToReport()" class="btn btn-info ms-2 fw-bold no-export">➕ Add Closing Staff</button>
           <button id="syncButton" class="btn btn-primary no-export">Sync From Loyverse</button>
           <button id="exportCsvBtn" onclick="exportReportToExcel()" class="btn btn-success ms-2 fw-bold">📥 Export Daily Excel</button>
           <button id="exportMonthlyBtn" onclick="exportMonthlyToExcel()" class="btn btn-warning ms-2 fw-bold no-export">📦 Export Monthly Excel</button>
@@ -108,6 +102,23 @@
           <div class="col-md-2">
             <label for="netSale" class="form-label">Net Sale</label>
             <input id="netSale" type="number" min="0" step="0.01" class="form-control" readonly />
+          </div>
+        </div>
+
+        <!-- Closing Staff Section -->
+        <div id="closingStaffSection" class="mt-4">
+          <h2 class="h5 mb-3">Closing Staff</h2>
+          <div class="detail-box p-3">
+            <div class="row g-3 mb-3">
+              <div class="col-md-8">
+                <label for="closingStaff" class="form-label small text-muted">Staff Name</label>
+                <input id="closingStaff" type="text" class="form-control" placeholder="Enter name" />
+              </div>
+              <div class="col-md-4 d-flex align-items-end">
+                <button id="addClosingStaffBtn" onclick="addClosingStaffToReport()" class="btn btn-sm btn-info w-100 fw-bold no-export">➕ Add Closing Staff</button>
+              </div>
+            </div>
+            <div id="closingStaffList"></div>
           </div>
         </div>
 
@@ -144,16 +155,6 @@
             <div id="expensesList" class="mt-3"></div>
           </div>
         </div>
-
-        <!-- Closing Staff Section -->
-        <div id="closingStaffSection" class="mt-4">
-          <h2 class="h5 mb-3">Closing Staff Entries</h2>
-          <div class="detail-box p-3">
-            <div id="closingStaffList"></div>
-          </div>
-        </div>
-
-
 
         <h2 class="h5 mt-4 mb-3">Order Payment Details</h2>
         <div class="row g-3 payment-details-row">
