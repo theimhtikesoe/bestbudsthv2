@@ -268,6 +268,23 @@ body {
   font-weight: 700;
 }
 
+.action-btn-row .btn {
+  min-height: 42px;
+}
+
+.summary-stack-col .gram-stat-card {
+  min-height: auto;
+}
+
+.section-grid > [class*='col-'] {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-grid .detail-box {
+  width: 100%;
+}
+
 .detail-box {
   border: 1px solid #3a3020;
   border-radius: 0.75rem;
@@ -520,6 +537,10 @@ body {
   }
   .detail-box {
     min-height: auto;
+  }
+
+  .action-btn-row .btn {
+    min-height: 40px;
   }
 }
 
