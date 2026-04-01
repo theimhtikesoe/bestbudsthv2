@@ -513,14 +513,25 @@ window.exportMonthlyToExcel = async function() {
       return;
     }
 
-    const data = await response.json();
-    const allReports = data.reports || [];
+    const allReports = await response.json();
+    
+    // Ensure allReports is an array
+    const reportsArray = Array.isArray(allReports) ? allReports : [];
 
     // Filter reports for the selected month
-    const monthReports = allReports.filter(report => {
-      if (!report.date) return false;
-      return report.date.startsWith(month);
-    });
+    // Month is in YYYY-MM format, report.date is YYYY-MM-DD
+    const monthReports = reportsArray
+      .filter(report => {
+        if (!report.date) return false;
+        // Handle potential Date object or ISO string from API
+        const reportDate = typeof report.date === 'string' ? report.date : new Date(report.date).toISOString().split('T')[0];
+        return reportDate.startsWith(month);
+      })
+      .sort((a, b) => {
+        const dateA = typeof a.date === 'string' ? a.date : new Date(a.date).toISOString().split('T')[0];
+        const dateB = typeof b.date === 'string' ? b.date : new Date(b.date).toISOString().split('T')[0];
+        return dateA.localeCompare(dateB);
+      });
 
     if (monthReports.length === 0) {
       window.showMessage("No reports found for the selected month", "warning");
@@ -583,8 +594,9 @@ window.exportMonthlyToExcel = async function() {
       totalTransfer += transferIn;
       totalGrams += grams;
 
+      const reportDate = typeof report.date === 'string' ? report.date : new Date(report.date).toISOString().split('T')[0];
       const rowData = [
-        report.date,
+        reportDate,
         netSale.toFixed(2),
         cashIn.toFixed(2),
         cardIn.toFixed(2),
