@@ -399,13 +399,17 @@ window.exportMonthlyToExcel = async function() {
     ));
 
     // Sync missing days from Loyverse to Database
+    // We use sequential sync to avoid overloading the API and ensure DB is updated
     for (const dateStr of targetDays) {
       if (!existingDates.has(dateStr)) {
         console.log(`Syncing missing date: ${dateStr}`);
         window.showMessage(`Syncing missing data for ${dateStr}...`, "info");
         try {
-          // Trigger sync and save to DB
-          await fetch(`/api/loyverse/sync?date=${dateStr}`);
+          // The backend now auto-saves to DB when this endpoint is called
+          const syncRes = await fetch(`/api/loyverse/sync?date=${dateStr}`);
+          if (syncRes.ok) {
+            console.log(`Successfully synced and saved ${dateStr}`);
+          }
         } catch (e) {
           console.warn(`Failed to sync ${dateStr}:`, e);
         }

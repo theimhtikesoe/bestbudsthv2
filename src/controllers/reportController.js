@@ -103,6 +103,60 @@ async function syncFromLoyverse(req, res, next) {
     validateDateOrThrow(date);
 
     const summary = await fetchSalesSummaryByDate(date);
+    
+    // Auto-save/upsert to database
+    const net_sale = toNumber(summary.net_sale);
+    const cash_total = toNumber(summary.cash_total);
+    const card_total = toNumber(summary.card_total);
+    const transfer_total = toNumber(summary.transfer_total);
+    const total_orders = toNumber(summary.total_orders);
+    const total_grams = toNumber(summary.total_grams);
+    const fb_total = toNumber(summary.fb_total);
+
+    const values = [
+      date, net_sale, cash_total, card_total, transfer_total,
+      total_orders, total_grams, fb_total, 0, 0, 0, 0, '1K Bill', 0, 0, 0, 0, 0
+    ];
+
+    if (isPostgres) {
+      await query(
+        `INSERT INTO daily_reports (
+          date, net_sale, cash_total, card_total, transfer_total,
+          total_orders, total_grams, fb_total, expense, tip,
+          ${oneKQtyColumn()}, ${oneKTotalColumn()}, safe_box_label,
+          safe_box_amount, opening_cash, actual_cash_counted, expected_cash, difference
+        ) VALUES (${placeholder(1)}, ${placeholder(2)}, ${placeholder(3)}, ${placeholder(4)}, ${placeholder(5)}, ${placeholder(6)}, ${placeholder(7)}, ${placeholder(8)}, ${placeholder(9)}, ${placeholder(10)}, ${placeholder(11)}, ${placeholder(12)}, ${placeholder(13)}, ${placeholder(14)}, ${placeholder(15)}, ${placeholder(16)}, ${placeholder(17)}, ${placeholder(18)})
+        ON CONFLICT (date) DO UPDATE SET
+          net_sale = EXCLUDED.net_sale,
+          cash_total = EXCLUDED.cash_total,
+          card_total = EXCLUDED.card_total,
+          transfer_total = EXCLUDED.transfer_total,
+          total_orders = EXCLUDED.total_orders,
+          total_grams = EXCLUDED.total_grams,
+          fb_total = EXCLUDED.fb_total`,
+        values
+      );
+    } else {
+      await query(
+        `INSERT INTO daily_reports (
+          date, net_sale, cash_total, card_total, transfer_total,
+          total_orders, total_grams, fb_total, expense, tip,
+          ${oneKQtyColumn()}, ${oneKTotalColumn()}, safe_box_label,
+          safe_box_amount, opening_cash, actual_cash_counted, expected_cash, difference
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          net_sale = VALUES(net_sale),
+          cash_total = VALUES(cash_total),
+          card_total = VALUES(card_total),
+          transfer_total = VALUES(transfer_total),
+          total_orders = VALUES(total_orders),
+          total_grams = VALUES(total_grams),
+          fb_total = VALUES(fb_total)`,
+        values
+      );
+    }
+
+    broadcast({ type: 'REPORT', date, action: 'SYNC' });
     res.json(summary);
   } catch (error) {
     next(error);
