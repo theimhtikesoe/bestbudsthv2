@@ -755,7 +755,9 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   font-size: 0.76rem;
   text-transform: uppercase;
   letter-spacing: 0.28px;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: break-word;
+  vertical-align: middle;
 }
 
 #orderEntriesTable tbody td {
@@ -766,6 +768,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   line-height: 1.35;
   vertical-align: middle;
   padding: 0.58rem 0.56rem;
+  word-break: break-word;
 }
 
 #orderEntriesTable tbody tr.table-light td {
@@ -802,9 +805,17 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 }
 
 #orderEntriesTable td:nth-child(1),
-#orderEntriesTable td:nth-child(2),
-#orderEntriesTable td:nth-child(3) {
+#orderEntriesTable td:nth-child(2) {
   white-space: nowrap;
+}
+
+#orderEntriesTable td:nth-child(3) {
+  white-space: normal;
+  min-width: 80px;
+}
+
+#orderEntriesTable td:nth-child(4) {
+  min-width: 150px;
 }
 
 #orderEntriesTable td:nth-child(5),

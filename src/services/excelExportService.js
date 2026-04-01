@@ -14,6 +14,19 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
   const sheet = workbook.addWorksheet('Daily Report');
   sheet.properties.defaultRowHeight = 22;
 
+  // Set column widths for better visibility
+  sheet.columns = [
+    { header: 'Item Type', key: 'type', width: 15 },
+    { header: 'Item Name', key: 'name', width: 35 },
+    { header: 'Qty', key: 'qty', width: 10 },
+    { header: 'Gram', key: 'gram', width: 12 },
+    { header: 'Unit Price', key: 'unitPrice', width: 15 },
+    { header: 'Discount', key: 'discount', width: 20 },
+    { header: 'Net Price', key: 'netPrice', width: 15 },
+    { header: 'Payment', key: 'payment', width: 15 },
+    { header: 'Note', key: 'note', width: 25 }
+  ];
+
   // Styling - matching frontend
   const border = { 
     top: { style: 'thin', color: { argb: 'FFD5B68A' } }, 
@@ -80,6 +93,7 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
   const flowerItems = [];
   const fbItems = [];
   let totalFlowerGrams = 0;
+  let calculatedFbTotal = 0;
 
   receipts.forEach(receipt => {
     const items = receipt.line_items || receipt.items || [];
@@ -156,7 +170,6 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
       
       // Rule: Skip items where price is 0 OR discount is 100%
       if (itemNetPrice <= 0.01 || discountPercent >= 99.99) {
-        console.log(`[EXPORT] Skipping zero-value item: ${itemName} (Net: ${itemNetPrice}, Discount: ${discountPercent}%)`);
         return;
       }
 
@@ -218,6 +231,7 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
 
       if (isFB) {
         fbItems.push(exportItem);
+        calculatedFbTotal += itemNetPrice;
       } else {
         flowerItems.push(exportItem);
       }
@@ -230,13 +244,14 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
   titleCell.value = `BestBuds Daily Report - ${date}`;
   titleCell.fill = titleFill;
   titleCell.font = { size: 14, bold: true, color: { argb: 'FFF8EBCF' } };
-  titleCell.alignment = { horizontal: 'center' };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
 
   // --- ROW 2: CLOSING STAFF ---
   sheet.mergeCells('A2:I2');
   const staffCell = sheet.getCell('A2');
   staffCell.value = `Closing Staff: ${closingStaff}`;
   staffCell.font = { bold: true };
+  staffCell.alignment = { vertical: 'middle' };
 
   let currRow = 4;
 
@@ -247,6 +262,7 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
     c.value = label;
     c.fill = sectionFill;
     c.font = { bold: true, color: { argb: 'FFF6E5C4' } };
+    c.alignment = { vertical: 'middle' };
     currRow++;
   };
 
@@ -259,6 +275,7 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
       c.fill = headerFill;
       c.font = { bold: true };
       c.border = border;
+      c.alignment = { vertical: 'middle', horizontal: 'center' };
     });
     currRow++;
   };
@@ -269,14 +286,27 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
   flowerItems.forEach((item, i) => {
     const row = sheet.getRow(currRow);
     row.values = [item.type, item.name, item.qty, item.gram, item.unitPrice, item.discount, item.netPrice, item.payment, item.note];
-    row.eachCell((cell, colNumber) => {
+    row.eachCell((cell) => {
       cell.fill = i % 2 === 0 ? rowLight : rowDark;
       cell.border = border;
+      cell.alignment = { vertical: 'middle' };
     });
     currRow++;
   });
 
-  currRow += 1;
+  // Add Flower Total Row
+  const flowerTotalRow = sheet.getRow(currRow);
+  flowerTotalRow.getCell(1).value = 'TOTAL FLOWERS';
+  flowerTotalRow.getCell(4).value = `${totalFlowerGrams.toFixed(3)} G`;
+  flowerTotalRow.eachCell((cell, colNumber) => {
+    if (colNumber === 1 || colNumber === 4) {
+      cell.font = { bold: true };
+      cell.fill = headerFill;
+      cell.border = border;
+      cell.alignment = { vertical: 'middle' };
+    }
+  });
+  currRow += 2;
 
   // --- SECTION 2: EXPENSES ---
   paintSection('Expenses');
@@ -287,17 +317,19 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
     c.fill = headerFill;
     c.font = { bold: true };
     c.border = border;
+    c.alignment = { vertical: 'middle', horizontal: 'center' };
   });
   currRow++;
 
   let totalExp = 0;
   if (expenses.length === 0) {
-    // Add placeholder row for no expenses
     sheet.getCell(`A${currRow}`).value = '-';
     sheet.getCell(`B${currRow}`).value = 'No expenses';
     sheet.getCell(`C${currRow}`).value = 0;
     ['A', 'B', 'C'].forEach(col => {
-      sheet.getCell(`${col}${currRow}`).border = border;
+      const c = sheet.getCell(`${col}${currRow}`);
+      c.border = border;
+      c.alignment = { vertical: 'middle' };
     });
     currRow++;
   } else {
@@ -308,14 +340,16 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
       sheet.getCell(`B${currRow}`).value = exp.description || '-';
       sheet.getCell(`C${currRow}`).value = amt;
       ['A', 'B', 'C'].forEach(col => {
-        sheet.getCell(`${col}${currRow}`).fill = i % 2 === 0 ? rowLight : rowDark;
-        sheet.getCell(`${col}${currRow}`).border = border;
+        const c = sheet.getCell(`${col}${currRow}`);
+        c.fill = i % 2 === 0 ? rowLight : rowDark;
+        c.border = border;
+        c.alignment = { vertical: 'middle' };
       });
       currRow++;
     });
   }
 
-  currRow += 1;
+  currRow += 2;
 
   // --- SECTION 3: FOOD & DRINKS ---
   paintSection('Food & Drinks');
@@ -323,42 +357,65 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
   fbItems.forEach((item, i) => {
     const row = sheet.getRow(currRow);
     row.values = [item.type, item.name, item.qty, item.gram, item.unitPrice, item.discount, item.netPrice, item.payment, item.note];
-    row.eachCell((cell, colNumber) => {
+    row.eachCell((cell) => {
       cell.fill = i % 2 === 0 ? rowLight : rowDark;
       cell.border = border;
+      cell.alignment = { vertical: 'middle' };
     });
     currRow++;
   });
 
-  currRow += 1;
+  // Add F&B Total Row
+  const fbTotalRow = sheet.getRow(currRow);
+  fbTotalRow.getCell(1).value = 'TOTAL F&B';
+  fbTotalRow.getCell(7).value = calculatedFbTotal;
+  fbTotalRow.getCell(7).numFmt = '#,##0.00 "THB"';
+  fbTotalRow.eachCell((cell, colNumber) => {
+    if (colNumber === 1 || colNumber === 7) {
+      cell.font = { bold: true };
+      cell.fill = headerFill;
+      cell.border = border;
+      cell.alignment = { vertical: 'middle' };
+    }
+  });
+  currRow += 2;
 
   // --- SECTION 4: DASHBOARD ---
   paintSection('Daily Summary Dashboard');
 
-  // Calculate totals
+  // Calculate totals from reportData
   const cashTotal = Number(reportData.cash_total || 0);
   const cardTotal = Number(reportData.card_total || 0);
   const transferTotal = Number(reportData.transfer_total || 0);
-  const fbTotal = Number(reportData.fb_total || 0);
+  const fbTotal = Number(reportData.fb_total || calculatedFbTotal || 0);
   const netSale = Number(reportData.net_sale || 0);
-  const totalGrams = Number(reportData.total_grams || 0);
+  const totalGrams = Number(reportData.total_grams || totalFlowerGrams || 0);
 
   const summaryData = [
-    ['Total Grams Sold', '', '', `${totalGrams.toFixed(3)} G`],
-    ['Cash In', '', '', `${cashTotal.toFixed(0)} THB`],
-    ['Card In', '', '', `${cardTotal.toFixed(0)} THB`],
-    ['Transfer In', '', '', `${transferTotal.toFixed(0)} THB`],
-    ['F&B Total', '', '', `${fbTotal.toFixed(0)} THB`],
-    ['Total Expenses', '', '', `${totalExp.toFixed(0)} THB`],
-    ['Net Sales (Total)', '', '', `${netSale.toFixed(0)} THB`],
-    ['Net Profit (After Expenses)', '', '', `${(netSale - totalExp).toFixed(0)} THB`]
+    ['Total Grams Sold', `${totalGrams.toFixed(3)} G`],
+    ['Cash In', `${cashTotal.toLocaleString()} THB`],
+    ['Card In', `${cardTotal.toLocaleString()} THB`],
+    ['Transfer In', `${transferTotal.toLocaleString()} THB`],
+    ['F&B Total', `${fbTotal.toLocaleString()} THB`],
+    ['Total Expenses', `${totalExp.toLocaleString()} THB`],
+    ['Net Sales (Total)', `${netSale.toLocaleString()} THB`],
+    ['Net Profit (After Expenses)', `${(netSale - totalExp).toLocaleString()} THB`]
   ];
 
-  summaryData.forEach((row, idx) => {
-    sheet.getCell(`A${currRow}`).value = row[0];
-    sheet.getCell(`D${currRow}`).value = row[3];
-    sheet.getCell(`A${currRow}`).border = border;
-    sheet.getCell(`D${currRow}`).border = border;
+  summaryData.forEach((row) => {
+    sheet.mergeCells(`A${currRow}:C${currRow}`);
+    const labelCell = sheet.getCell(`A${currRow}`);
+    labelCell.value = row[0];
+    labelCell.border = border;
+    labelCell.font = { bold: true };
+    labelCell.alignment = { vertical: 'middle' };
+
+    sheet.mergeCells(`D${currRow}:F${currRow}`);
+    const valueCell = sheet.getCell(`D${currRow}`);
+    valueCell.value = row[1];
+    valueCell.border = border;
+    valueCell.alignment = { vertical: 'middle', horizontal: 'right' };
+    
     currRow++;
   });
 

@@ -309,6 +309,19 @@ window.exportReportToExcel = async function() {
     const sheet = workbook.addWorksheet("Daily Report");
     sheet.properties.defaultRowHeight = 22;
 
+    // Set column widths for better visibility
+    sheet.columns = [
+      { header: 'Item Type', key: 'type', width: 15 },
+      { header: 'Item Name', key: 'name', width: 35 },
+      { header: 'Qty', key: 'qty', width: 10 },
+      { header: 'Gram', key: 'gram', width: 12 },
+      { header: 'Unit Price', key: 'unitPrice', width: 15 },
+      { header: 'Discount', key: 'discount', width: 20 },
+      { header: 'Net Price', key: 'netPrice', width: 15 },
+      { header: 'Payment', key: 'payment', width: 15 },
+      { header: 'Note', key: 'note', width: 25 }
+    ];
+
     const border = { top: { style: "thin", color: { argb: "FFD5B68A" } }, left: { style: "thin", color: { argb: "FFD5B68A" } }, bottom: { style: "thin", color: { argb: "FFD5B68A" } }, right: { style: "thin", color: { argb: "FFD5B68A" } } };
     const titleFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2A2010" } };
     const sectionFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF3D2A14" } };
@@ -349,11 +362,24 @@ window.exportReportToExcel = async function() {
       [item.type, item.name, item.qty, item.gram, item.unitPrice, item.discount, item.netPrice, item.payment, item.note].forEach((v, idx) => {
         const c = r.getCell(idx + 1);
         c.value = v; c.fill = i % 2 === 0 ? rowLight : rowDark; c.border = border;
+        c.alignment = { vertical: 'middle' };
       });
       currRow++;
     });
 
-    currRow++;
+    // Add Flower Total Row
+    const flowerTotalRow = sheet.getRow(currRow);
+    flowerTotalRow.getCell(1).value = 'TOTAL FLOWERS';
+    flowerTotalRow.getCell(4).value = `${totalFlowerGrams.toFixed(3)} G`;
+    flowerTotalRow.eachCell((cell, colNumber) => {
+      if (colNumber === 1 || colNumber === 4) {
+        cell.font = { bold: true };
+        cell.fill = headerFill;
+        cell.border = border;
+        cell.alignment = { vertical: 'middle' };
+      }
+    });
+    currRow += 2;
     paintSection("Expenses");
     ["Category", "Description", "Amount"].forEach((h, i) => {
       const c = sheet.getCell(currRow, i + 1);
@@ -382,16 +408,32 @@ window.exportReportToExcel = async function() {
     currRow++;
     paintSection("Food & Drinks");
     paintHeader();
+    let calculatedFbTotal = 0;
     fbItems.forEach((item, i) => {
       const r = sheet.getRow(currRow);
       [item.type, item.name, item.qty, item.gram, item.unitPrice, item.discount, item.netPrice, item.payment, item.note].forEach((v, idx) => {
         const c = r.getCell(idx + 1);
         c.value = v; c.fill = i % 2 === 0 ? rowLight : rowDark; c.border = border;
+        c.alignment = { vertical: 'middle' };
       });
+      if (typeof item.netPrice === 'number') calculatedFbTotal += item.netPrice;
       currRow++;
     });
 
-    currRow++;
+    // Add F&B Total Row
+    const fbTotalRow = sheet.getRow(currRow);
+    fbTotalRow.getCell(1).value = 'TOTAL F&B';
+    fbTotalRow.getCell(7).value = calculatedFbTotal;
+    fbTotalRow.getCell(7).numFmt = '#,##0.00 "THB"';
+    fbTotalRow.eachCell((cell, colNumber) => {
+      if (colNumber === 1 || colNumber === 7) {
+        cell.font = { bold: true };
+        cell.fill = headerFill;
+        cell.border = border;
+        cell.alignment = { vertical: 'middle' };
+      }
+    });
+    currRow += 2;
     paintSection("Daily Summary Dashboard");
     
     // Use F&B Total directly from synced data to match UI
@@ -404,21 +446,30 @@ window.exportReportToExcel = async function() {
     }, 0);
     
     const summaryData = [
-      ["Total Grams Sold", "", "", `${Number(rawData.total_grams || 0).toFixed(3)} G`],
-      ["Cash In", "", "", `${cashTotal.toFixed(0)} THB`],
-      ["Card In", "", "", `${cardTotal.toFixed(0)} THB`],
-      ["Transfer In", "", "", `${transferTotal.toFixed(0)} THB`],
-      ["F&B Total", "", "", `${fbTotal.toFixed(0)} THB`],
-      ["Total Expenses", "", "", `${totalExp.toFixed(0)} THB`],
-      ["Net Sales (Total)", "", "", `${netSale.toFixed(0)} THB`],
-      ["Net Profit (After Expenses)", "", "", `${(netSale - totalExp).toFixed(0)} THB`]
+      ["Total Grams Sold", `${Number(rawData.total_grams || totalFlowerGrams || 0).toFixed(3)} G`],
+      ["Cash In", `${cashTotal.toLocaleString()} THB`],
+      ["Card In", `${cardTotal.toLocaleString()} THB`],
+      ["Transfer In", `${transferTotal.toLocaleString()} THB`],
+      ["F&B Total", `${(fbTotal || calculatedFbTotal || 0).toLocaleString()} THB`],
+      ["Total Expenses", `${totalExp.toLocaleString()} THB`],
+      ["Net Sales (Total)", `${netSale.toLocaleString()} THB`],
+      ["Net Profit (After Expenses)", `${(netSale - totalExp).toLocaleString()} THB`]
     ];
     
-    summaryData.forEach((row, idx) => {
-      sheet.getCell(`A${currRow}`).value = row[0];
-      sheet.getCell(`D${currRow}`).value = row[3];
-      sheet.getCell(`A${currRow}`).border = border;
-      sheet.getCell(`D${currRow}`).border = border;
+    summaryData.forEach((row) => {
+      sheet.mergeCells(`A${currRow}:C${currRow}`);
+      const labelCell = sheet.getCell(`A${currRow}`);
+      labelCell.value = row[0];
+      labelCell.border = border;
+      labelCell.font = { bold: true };
+      labelCell.alignment = { vertical: 'middle' };
+
+      sheet.mergeCells(`D${currRow}:F${currRow}`);
+      const valueCell = sheet.getCell(`D${currRow}`);
+      valueCell.value = row[1];
+      valueCell.border = border;
+      valueCell.alignment = { vertical: 'middle', horizontal: 'right' };
+      
       currRow++;
     });
 
