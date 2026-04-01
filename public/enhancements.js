@@ -36,17 +36,15 @@ function setupRealtimeListener() {
       const currentDate = document.getElementById("reportDate")?.value;
 
       if (data.date === currentDate) {
-        if (data.type === 'EXPENSE_UPDATE') {
-          console.log('Updating expenses for', currentDate);
+        console.log(`Received ${data.type} for ${data.date}. Triggering UI update.`);
+        // Any update type (EXPENSE, STAFF, REPORT) should refresh relevant parts
+        // To be safe and meet the user's "auto refresh/syncing" requirement, 
+        // we refresh everything when any update occurs for the current date.
+        if (typeof window.loadReportData === 'function') {
+          window.loadReportData(currentDate);
+        } else {
           fetchExpenses(currentDate);
-        } else if (data.type === 'STAFF_UPDATE') {
-          console.log('Updating staff for', currentDate);
           fetchStaff(currentDate);
-        } else if (data.type === 'REPORT_UPDATE') {
-          console.log('Updating full report for', currentDate);
-          if (typeof window.loadReportData === 'function') {
-            window.loadReportData(currentDate);
-          }
         }
       }
     } catch (error) {

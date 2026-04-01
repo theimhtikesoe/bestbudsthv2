@@ -497,7 +497,8 @@ async function removeExpense(req, res, next) {
     await query(sql, [id]);
 
     if (date) {
-      broadcast({ type: 'EXPENSE_UPDATE', date: dayjs(date).format('YYYY-MM-DD') });
+      const formattedDate = dayjs(date).format('YYYY-MM-DD');
+      broadcast({ type: 'EXPENSE_UPDATE', date: formattedDate });
     }
 
     res.json({ success: true, message: 'Expense deleted' });
@@ -581,7 +582,8 @@ async function removeStaff(req, res, next) {
     await query(sql, [id]);
 
     if (date) {
-      broadcast({ type: 'STAFF_UPDATE', date: dayjs(date).format('YYYY-MM-DD') });
+      const formattedDate = dayjs(date).format('YYYY-MM-DD');
+      broadcast({ type: 'STAFF_UPDATE', date: formattedDate });
     }
 
     res.json({ success: true, message: 'Staff deleted' });
