@@ -29,11 +29,20 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
     'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
     'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
     'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-    'free pina colada', 'thc gummy'
+    'free pina colada', 'flower', 'bud', 'pre-roll', 'joint'
   ];
 
-  const fbKeywords = ['soft drink', 'snacks', 'gummy', 'water', 'soda', 'milk', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'food', 'coffee', 'juice', 'bakery', 'cookie', 'brownie', 'cake', 'soju'];
-  const accessoryKeywords = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray', 'pipe', 'small pipe', 'best buds grinder', 'best buds shirt', 'nf best buds shirt', 'sw best buds shirt'];
+  const fbKeywords = [
+    'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
+    'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
+    'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
+  ];
+  const accessoryKeywords = [
+    'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
+    'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray',
+    'pipe', 'small pipe', 'best buds grinder', 'best buds shirt',
+    'nf best buds shirt', 'sw best buds shirt'
+  ];
 
   function toMoneyNumber(value) {
     if (value === null || value === undefined) return null;
@@ -145,14 +154,16 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
 
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
-      let isLobbyShirt = itemName.includes('the lobby shirt');
       let isAccessory = accessoryKeywords.some(k => itemName.includes(k) || category.includes(k));
 
-      let isFB = !isFlowerStrain && !isAccessory && (
+      let isFB = !isFlowerStrain && !isThcGummy && (
         fbKeywords.some(k => itemName.includes(k) || category.includes(k)) ||
-        (['tea'].some(k => itemName.includes(k) || category.includes(k)) && !itemName.includes('tea time')) ||
-        (grossPrice / (qty || 1)) <= 50
+        (['tea'].some(k => itemName.includes(k) || category.includes(k)) && !itemName.includes('tea time'))
       );
+
+      if (!isFlowerStrain && !isFB && !isThcGummy && !isAccessory) {
+        if (grossPrice / (qty || 1) <= 50) isFB = true; else isFlowerStrain = true;
+      }
 
       const exportType = isFB ? 'F&B' : (isAccessory ? 'Accessories' : 'Flower/Main');
       const exportItem = {
@@ -247,12 +258,13 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
 
   const dashboard = [
     ['Total Grams Sold', totalFlowerGrams, 'G'],
-    ['Cash In', reportData.cash_total || 0, 'THB'],
-    ['Card In', reportData.card_total || 0, 'THB'],
-    ['Transfer In', reportData.transfer_total || 0, 'THB'],
+    ['Cash Total', reportData.cash_total || 0, 'THB'],
+    ['Card Total', reportData.card_total || 0, 'THB'],
+    ['Transfer Total', reportData.transfer_total || 0, 'THB'],
+    ['F&B Total', fbItems.reduce((a, b) => a + b.netPrice, 0), 'THB'],
     ['Total Expenses', totalExp, 'THB'],
-    ['Net Sales (Total)', reportData.net_sale || 0, 'THB'],
-    ['Net Profit (After Expenses)', (reportData.net_sale || 0) - totalExp, 'THB']
+    ['Net Sale', reportData.net_sale || 0, 'THB'],
+    ['Net Profit', (reportData.net_sale || 0) - totalExp, 'THB']
   ];
 
   dashboard.forEach(d => {

@@ -483,15 +483,32 @@ window.exportReportToExcel = async function() {
         const discountPercent = grossPrice > 0 ? Math.round(totalItemDiscount / grossPrice * 100) : 0;
         const discountStr = totalItemDiscount > 0.01 ? `${discountPercent}% (${totalItemDiscount.toFixed(2)} THB)` : "-";
 
-        const flowerStrains = ['grape soda', 'big foot', 'honey bee', 'jealousy mintz', 'crystal candy', 'alien mint', 'rocket fuel', 'gold dust', 'darth vader', 'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz', 'free pina colada', 'flower', 'bud', 'pre-roll', 'joint'];
-        const fbKeywords = ['water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice', 'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'];
-        const accessoryKeywords = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray', 'pipe', 'small pipe'];
+        const flowerStrains = [
+          'grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 
+          'moonbow', 'emergen c', 'tea time', 'silver shadow', 
+          'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez',
+          'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
+          'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
+          'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
+          'free pina colada', 'flower', 'bud', 'pre-roll', 'joint'
+        ];
+        const fbKeywords = [
+          'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
+          'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
+          'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
+        ];
+        const accessoryKeywords = [
+          'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
+          'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray',
+          'pipe', 'small pipe', 'best buds grinder', 'best buds shirt',
+          'nf best buds shirt', 'sw best buds shirt'
+        ];
 
         let isFlowerStrain = flowerStrains.some(s => itemName.includes(s));
         let isThcGummy = itemName.includes("thc gummy");
-        let isLobbyShirt = itemName.includes("the lobby shirt");
         let isAccessory = accessoryKeywords.some(k => itemName.includes(k) || category.includes(k));
-        let isFB = !isFlowerStrain && !isThcGummy && fbKeywords.some(k => itemName.includes(k) || category.includes(k));
+        let isFB = !isFlowerStrain && !isThcGummy && (fbKeywords.some(k => itemName.includes(k) || category.includes(k)) ||
+                   (['tea'].some(k => itemName.includes(k) || category.includes(k)) && !itemName.includes('tea time')));
 
         if (!isFlowerStrain && !isFB && !isThcGummy && !isAccessory) {
           if (grossPrice / (qty || 1) <= 50) isFB = true; else isFlowerStrain = true;
