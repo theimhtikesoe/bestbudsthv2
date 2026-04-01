@@ -1,25 +1,31 @@
 const ExcelJS = require('exceljs');
 
 /**
- * Generate Excel report matching the user's detailed Monthly Report template
+ * Generate Excel report matching the frontend export template
  * @param {string} date - Report date
  * @param {Object} reportData - Sales summary data
  * @param {Array} receipts - Original Loyverse receipts
  * @param {Array} expenses - Daily expenses
+ * @param {string} closingStaff - Closing staff names (optional)
  * @returns {Promise<Buffer>} Excel file buffer
  */
-async function generateExcelReport(date, reportData, receipts, expenses) {
+async function generateExcelReport(date, reportData, receipts, expenses, closingStaff = 'N/A') {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Daily Report');
+  sheet.properties.defaultRowHeight = 22;
 
-  // Styling
-  const border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-  const boldFont = { bold: true };
-  const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD3D3D3' } };
-
-  // Row 1: Title
-  sheet.getCell('A1').value = `Daily Report - ${date}`;
-  sheet.getCell('A1').font = { size: 14, bold: true };
+  // Styling - matching frontend
+  const border = { 
+    top: { style: 'thin', color: { argb: 'FFD5B68A' } }, 
+    left: { style: 'thin', color: { argb: 'FFD5B68A' } }, 
+    bottom: { style: 'thin', color: { argb: 'FFD5B68A' } }, 
+    right: { style: 'thin', color: { argb: 'FFD5B68A' } } 
+  };
+  const titleFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2A2010' } };
+  const sectionFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF3D2A14' } };
+  const headerFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1D8AC' } };
+  const rowLight = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFBF4' } };
+  const rowDark = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF4E0' } };
 
   // Item Classification Logic
   const flowerStrains = [
@@ -37,6 +43,7 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
     'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
     'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
   ];
+  
   const accessoryKeywords = [
     'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
     'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray',
@@ -183,12 +190,26 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
       }
 
       const exportType = isFB ? 'F&B' : (isAccessory ? 'Accessories' : 'Flower/Main');
+      
+      // Determine display values
+      let displayQty = qty;
+      let displayGram = '-';
+      
+      // For flower strains (not gummy, not accessories), show gram instead of qty
+      if (isFlowerStrain && !isThcGummy && !isAccessory && !isLobbyShirt) {
+        displayQty = '-';
+        displayGram = `${qty.toFixed(3)} G`;
+        totalFlowerGrams += qty;
+      }
+
+      const unitPrice = grossPrice / (qty || 1);
+
       const exportItem = {
         type: exportType,
         name: item.name || item.item_name,
-        qty: ((isFlowerStrain || isThcGummy) && !isThcGummy && !isLobbyShirt && !isAccessory) ? '-' : qty,
-        gram: ((isFlowerStrain || isThcGummy) && !isThcGummy && !isLobbyShirt && !isAccessory) ? `${qty.toFixed(3)} G` : '-',
-        unitPrice: grossPrice / (qty || 1),
+        qty: displayQty,
+        gram: displayGram,
+        unitPrice: unitPrice,
         discount: discountStr,
         netPrice: itemNetPrice,
         payment: paymentMethod,
@@ -199,98 +220,145 @@ async function generateExcelReport(date, reportData, receipts, expenses) {
         fbItems.push(exportItem);
       } else {
         flowerItems.push(exportItem);
-        const isMainFlower = isFlowerStrain && !isThcGummy && !isLobbyShirt && !isAccessory;
-        if (isMainFlower) {
-          totalFlowerGrams += qty;
-        }
       }
     });
   });
 
+  // --- ROW 1: TITLE ---
+  sheet.mergeCells('A1:I1');
+  const titleCell = sheet.getCell('A1');
+  titleCell.value = `BestBuds Daily Report - ${date}`;
+  titleCell.fill = titleFill;
+  titleCell.font = { size: 14, bold: true, color: { argb: 'FFF8EBCF' } };
+  titleCell.alignment = { horizontal: 'center' };
+
+  // --- ROW 2: CLOSING STAFF ---
+  sheet.mergeCells('A2:I2');
+  const staffCell = sheet.getCell('A2');
+  staffCell.value = `Closing Staff: ${closingStaff}`;
+  staffCell.font = { bold: true };
+
+  let currRow = 4;
+
+  // Helper function to paint section header
+  const paintSection = (label) => {
+    sheet.mergeCells(`A${currRow}:I${currRow}`);
+    const c = sheet.getCell(`A${currRow}`);
+    c.value = label;
+    c.fill = sectionFill;
+    c.font = { bold: true, color: { argb: 'FFF6E5C4' } };
+    currRow++;
+  };
+
+  // Helper function to paint column headers
+  const paintHeader = () => {
+    const headers = ['Item Type', 'Item Name', 'Qty', 'Gram', 'Unit Price', 'Discount', 'Net Price', 'Payment', 'Note'];
+    headers.forEach((h, i) => {
+      const c = sheet.getCell(currRow, i + 1);
+      c.value = h;
+      c.fill = headerFill;
+      c.font = { bold: true };
+      c.border = border;
+    });
+    currRow++;
+  };
+
   // --- SECTION 1: FLOWERS & ACCESSORIES ---
-  sheet.getCell('A3').value = 'Flower / Main / Accessories';
-  sheet.getCell('A3').font = boldFont;
-
-  const headers = ['Item Type', 'Item Name', 'Qty', 'Gram', 'Unit Price', 'Discount', 'Net Price', 'Payment', 'Note'];
-  headers.forEach((h, i) => {
-    const cell = sheet.getCell(4, i + 1);
-    cell.value = h;
-    cell.font = boldFont;
-    cell.fill = headerFill;
-    cell.border = border;
-  });
-
-  let currRow = 5;
-  flowerItems.forEach(item => {
+  paintSection('Flower / Main / Accessories');
+  paintHeader();
+  flowerItems.forEach((item, i) => {
     const row = sheet.getRow(currRow);
     row.values = [item.type, item.name, item.qty, item.gram, item.unitPrice, item.discount, item.netPrice, item.payment, item.note];
-    row.eachCell(cell => cell.border = border);
+    row.eachCell((cell, colNumber) => {
+      cell.fill = i % 2 === 0 ? rowLight : rowDark;
+      cell.border = border;
+    });
     currRow++;
   });
 
-  currRow += 2;
+  currRow += 1;
+
   // --- SECTION 2: EXPENSES ---
-  sheet.getCell(`A${currRow}`).value = 'Expenses';
-  sheet.getCell(`A${currRow}`).font = boldFont;
-  currRow++;
-  ['Category', 'Description', 'Amount'].forEach((h, i) => {
-    const cell = sheet.getCell(currRow, i + 1);
-    cell.value = h;
-    cell.font = boldFont;
-    cell.border = border;
+  paintSection('Expenses');
+  const expenseHeaders = ['Category', 'Description', 'Amount'];
+  expenseHeaders.forEach((h, i) => {
+    const c = sheet.getCell(currRow, i + 1);
+    c.value = h;
+    c.fill = headerFill;
+    c.font = { bold: true };
+    c.border = border;
   });
   currRow++;
+
   let totalExp = 0;
-  expenses.forEach(exp => {
-    totalExp += parseFloat(exp.amount || 0);
-    const row = sheet.getRow(currRow);
-    row.values = [exp.category, exp.description || '-', parseFloat(exp.amount || 0)];
-    row.eachCell(cell => cell.border = border);
+  if (expenses.length === 0) {
+    // Add placeholder row for no expenses
+    sheet.getCell(`A${currRow}`).value = '-';
+    sheet.getCell(`B${currRow}`).value = 'No expenses';
+    sheet.getCell(`C${currRow}`).value = 0;
+    ['A', 'B', 'C'].forEach(col => {
+      sheet.getCell(`${col}${currRow}`).border = border;
+    });
     currRow++;
-  });
-  currRow += 2;
+  } else {
+    expenses.forEach((exp, i) => {
+      const amt = Number(exp.amount || 0);
+      totalExp += amt;
+      sheet.getCell(`A${currRow}`).value = exp.category;
+      sheet.getCell(`B${currRow}`).value = exp.description || '-';
+      sheet.getCell(`C${currRow}`).value = amt;
+      ['A', 'B', 'C'].forEach(col => {
+        sheet.getCell(`${col}${currRow}`).fill = i % 2 === 0 ? rowLight : rowDark;
+        sheet.getCell(`${col}${currRow}`).border = border;
+      });
+      currRow++;
+    });
+  }
+
+  currRow += 1;
 
   // --- SECTION 3: FOOD & DRINKS ---
-  sheet.getCell(`A${currRow}`).value = 'Food & Drinks';
-  sheet.getCell(`A${currRow}`).font = boldFont;
-  currRow++;
-  headers.forEach((h, i) => {
-    const cell = sheet.getCell(currRow, i + 1);
-    cell.value = h;
-    cell.font = boldFont;
-    cell.fill = headerFill;
-    cell.border = border;
-  });
-  currRow++;
-  fbItems.forEach(item => {
+  paintSection('Food & Drinks');
+  paintHeader();
+  fbItems.forEach((item, i) => {
     const row = sheet.getRow(currRow);
     row.values = [item.type, item.name, item.qty, item.gram, item.unitPrice, item.discount, item.netPrice, item.payment, item.note];
-    row.eachCell(cell => cell.border = border);
+    row.eachCell((cell, colNumber) => {
+      cell.fill = i % 2 === 0 ? rowLight : rowDark;
+      cell.border = border;
+    });
     currRow++;
   });
-  currRow += 2;
+
+  currRow += 1;
 
   // --- SECTION 4: DASHBOARD ---
-  sheet.getCell(`A${currRow}`).value = 'Daily Summary Dashboard';
-  sheet.getCell(`A${currRow}`).font = boldFont;
-  currRow++;
+  paintSection('Daily Summary Dashboard');
 
-  const dashboard = [
-    ['Total Grams Sold', Number(reportData.total_grams || 0), 'G'],
-    ['Cash Total', reportData.cash_total || 0, 'THB'],
-    ['Card Total', reportData.card_total || 0, 'THB'],
-    ['Transfer Total', reportData.transfer_total || 0, 'THB'],
-    ['F&B Total', Number(reportData.fb_total || 0), 'THB'],
-    ['Total Expenses', totalExp, 'THB'],
-    ['Net Sale', reportData.net_sale || 0, 'THB'],
-    ['Net Profit', (reportData.net_sale || 0) - totalExp, 'THB']
+  // Calculate totals
+  const cashTotal = Number(reportData.cash_total || 0);
+  const cardTotal = Number(reportData.card_total || 0);
+  const transferTotal = Number(reportData.transfer_total || 0);
+  const fbTotal = Number(reportData.fb_total || 0);
+  const netSale = Number(reportData.net_sale || 0);
+  const totalGrams = Number(reportData.total_grams || 0);
+
+  const summaryData = [
+    ['Total Grams Sold', '', '', `${totalGrams.toFixed(3)} G`],
+    ['Cash In', '', '', `${cashTotal.toFixed(0)} THB`],
+    ['Card In', '', '', `${cardTotal.toFixed(0)} THB`],
+    ['Transfer In', '', '', `${transferTotal.toFixed(0)} THB`],
+    ['F&B Total', '', '', `${fbTotal.toFixed(0)} THB`],
+    ['Total Expenses', '', '', `${totalExp.toFixed(0)} THB`],
+    ['Net Sales (Total)', '', '', `${netSale.toFixed(0)} THB`],
+    ['Net Profit (After Expenses)', '', '', `${(netSale - totalExp).toFixed(0)} THB`]
   ];
 
-  dashboard.forEach(d => {
-    sheet.getCell(`A${currRow}`).value = d[0];
-    sheet.getCell(`B${currRow}`).value = d[1];
-    sheet.getCell(`C${currRow}`).value = d[2];
-    ['A','B','C'].forEach(col => sheet.getCell(`${col}${currRow}`).border = border);
+  summaryData.forEach((row, idx) => {
+    sheet.getCell(`A${currRow}`).value = row[0];
+    sheet.getCell(`D${currRow}`).value = row[3];
+    sheet.getCell(`A${currRow}`).border = border;
+    sheet.getCell(`D${currRow}`).border = border;
     currRow++;
   });
 

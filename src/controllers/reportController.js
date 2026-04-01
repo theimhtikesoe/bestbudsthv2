@@ -425,7 +425,15 @@ async function exportToExcel(req, res, next) {
       );
     }
 
-    const buffer = await generateExcelReport(date, reportData, receipts, expenses);
+    // Get closing staff
+    const staffRows = await query(
+      `SELECT name FROM daily_staff WHERE date = ${placeholder(1)} ORDER BY created_at DESC`,
+      [date]
+    );
+    const staffList = Array.isArray(staffRows) ? staffRows : [];
+    const closingStaff = staffList.length > 0 ? staffList.map(s => s.name).join(', ') : 'N/A';
+
+    const buffer = await generateExcelReport(date, reportData, receipts, expenses, closingStaff);
 
     // Send file
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
