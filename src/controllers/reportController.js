@@ -110,12 +110,13 @@ async function getReportByDate(req, res, next) {
     validateDateOrThrow(date);
 
     const rows = await query(`SELECT * FROM daily_reports WHERE date = ${placeholder(1)}`, [date]);
+    const reportList = Array.isArray(rows) ? rows : [];
 
-    if (rows.length === 0) {
+    if (reportList.length === 0) {
       return res.status(404).json({ message: 'Report not found for this date' });
     }
 
-    return res.json(rows[0]);
+    return res.json(reportList[0]);
   } catch (error) {
     return next(error);
   }
@@ -278,7 +279,7 @@ async function listReports(req, res, next) {
     params.push(limit);
 
     const rows = await query(sql, params);
-    return res.json(rows);
+    return res.json(Array.isArray(rows) ? rows : []);
   } catch (error) {
     return next(error);
   }
@@ -292,8 +293,9 @@ async function getLast7DayNetSales(req, res, next) {
        ORDER BY date DESC
        LIMIT 7`
     );
+    const resultList = Array.isArray(rows) ? rows : [];
 
-    return res.json(rows.reverse());
+    return res.json(resultList.reverse());
   } catch (error) {
     return next(error);
   }
@@ -327,9 +329,10 @@ async function getReportsSummary(req, res, next) {
     sql += ' ORDER BY date ASC';
 
     const rows = await query(sql, params);
+    const resultList = Array.isArray(rows) ? rows : [];
 
     const summary = calculatePeriodBusinessSummary(
-      rows.map((row) => ({
+      resultList.map((row) => ({
         cashSales: toNumber(row.cash_total),
         cardSales: toNumber(row.card_total),
         transferSales: toNumber(row.transfer_total),
@@ -343,7 +346,7 @@ async function getReportsSummary(req, res, next) {
     return res.json({
       from: from || null,
       to: to || null,
-      days: rows.length,
+      days: resultList.length,
       ...summary
     });
   } catch (error) {
@@ -368,7 +371,8 @@ async function exportToExcel(req, res, next) {
       `SELECT * FROM daily_reports WHERE date = ${placeholder(1)}`,
       [date]
     );
-    const reportData = reportRows[0];
+    const reportList = Array.isArray(reportRows) ? reportRows : [];
+    const reportData = reportList[0];
 
     if (!reportData) {
       const error = new Error('Report not found');
@@ -396,7 +400,7 @@ async function exportToExcel(req, res, next) {
       );
     }
 
-    const buffer = await generateExcelReport(date, reportRows[0], receipts, expenses);
+    const buffer = await generateExcelReport(date, reportData, receipts, expenses);
 
     // Send file
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -435,7 +439,8 @@ async function addExpense(req, res, next) {
 
     // Ensure daily_report exists for this date due to foreign key constraint
     const existingReport = await query(`SELECT date FROM daily_reports WHERE date = ${placeholder(1)}`, [date]);
-    if (existingReport.length === 0) {
+    const existingReportList = Array.isArray(existingReport) ? existingReport : [];
+    if (existingReportList.length === 0) {
       // Create a skeleton report if it doesn't exist
       const insertSql = isPostgres 
         ? `INSERT INTO daily_reports (date) VALUES ($1) ON CONFLICT (date) DO NOTHING`
@@ -450,7 +455,7 @@ async function addExpense(req, res, next) {
 
     res.status(201).json({
       success: true,
-      expense: result[0]
+      expense: isPostgres ? result[0] : { id: result.insertId, date, category, description, amount: expenseAmount }
     });
   } catch (error) {
     return next(error);
@@ -469,7 +474,8 @@ async function removeExpense(req, res, next) {
       : `DELETE FROM daily_expenses WHERE id = ?`;
 
     const rows = await query(`SELECT date FROM daily_expenses WHERE id = ${placeholder(1)}`, [id]);
-    const date = rows[0]?.date;
+    const resultList = Array.isArray(rows) ? rows : [];
+    const date = resultList[0]?.date;
 
     await query(sql, [id]);
 
@@ -499,8 +505,8 @@ async function listExpenses(req, res, next) {
 
     res.json({
       date,
-      expenses,
-      total: expenses.reduce((sum, e) => sum + toNumber(e.amount), 0)
+      expenses: Array.isArray(expenses) ? expenses : [],
+      total: (Array.isArray(expenses) ? expenses : []).reduce((sum, e) => sum + toNumber(e.amount), 0)
     });
   } catch (error) {
     return next(error);
@@ -523,7 +529,8 @@ async function addStaff(req, res, next) {
 
     // Ensure daily_report exists
     const existingReport = await query(`SELECT date FROM daily_reports WHERE date = ${placeholder(1)}`, [date]);
-    if (existingReport.length === 0) {
+    const existingReportList = Array.isArray(existingReport) ? existingReport : [];
+    if (existingReportList.length === 0) {
       const insertSql = isPostgres 
         ? `INSERT INTO daily_reports (date) VALUES ($1) ON CONFLICT (date) DO NOTHING`
         : `INSERT IGNORE INTO daily_reports (date) VALUES (?)`;
@@ -540,7 +547,7 @@ async function addStaff(req, res, next) {
 
     res.status(201).json({
       success: true,
-      staff: result[0]
+      staff: isPostgres ? result[0] : { id: result.insertId, date, name }
     });
   } catch (error) {
     next(error);
@@ -554,7 +561,8 @@ async function removeStaff(req, res, next) {
   try {
     const { id } = req.params;
     const rows = await query(`SELECT date FROM daily_staff WHERE id = ${placeholder(1)}`, [id]);
-    const date = rows[0]?.date;
+    const resultList = Array.isArray(rows) ? rows : [];
+    const date = resultList[0]?.date;
 
     const sql = isPostgres
       ? `DELETE FROM daily_staff WHERE id = $1`
@@ -588,7 +596,7 @@ async function listStaff(req, res, next) {
 
     res.json({
       date,
-      staff
+      staff: Array.isArray(staff) ? staff : []
     });
   } catch (error) {
     next(error);

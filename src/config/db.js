@@ -230,10 +230,14 @@ async function initializeSchema() {
     .filter(Boolean);
 
   for (const statement of statements) {
-    if (DIALECT === 'postgres') {
-      await getPostgresPool().query(statement);
-    } else {
-      await getMysqlPool().query(statement);
+    try {
+      if (DIALECT === 'postgres') {
+        await getPostgresPool().query(statement);
+      } else {
+        await getMysqlPool().query(statement);
+      }
+    } catch (err) {
+      console.warn(`[DB] Warning executing statement: ${statement.substring(0, 50)}... Error: ${err.message}`);
     }
   }
 
@@ -249,8 +253,8 @@ async function query(sql, params = []) {
     return result.rows;
   }
 
-  const [rows] = await getMysqlPool().execute(sql, params);
-  return rows;
+  const [result] = await getMysqlPool().execute(sql, params);
+  return result;
 }
 
 async function testConnection() {
