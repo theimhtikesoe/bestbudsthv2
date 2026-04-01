@@ -462,7 +462,10 @@ function processOrdersData(data) {
         itemNetPrice = lineItemNetPrice - (lineItemNetPrice / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
       }
 
-      if (itemNetPrice <= 0.01) return;
+      const itemDiscount = Math.max(0, grossPrice - itemNetPrice);
+      const itemDiscountPercent = grossPrice > 0 ? (itemDiscount / grossPrice * 100) : 0;
+      
+      if (itemNetPrice <= 0.01 || itemDiscountPercent >= 99.99) return;
 
       let qty = qtyRaw;
       if (itemName.includes('lemon cherry') && grossPrice >= 4970) {

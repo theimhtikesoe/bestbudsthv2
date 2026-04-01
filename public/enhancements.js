@@ -230,10 +230,10 @@ window.exportReportToExcel = async function() {
         let lineItemDiscount = getMoney(item.total_discount_money, item.discount_money) || 0;
         let itemNetPrice = getMoney(item.total_money) || Math.max(0, grossPrice - lineItemDiscount);
 
-        if (itemNetPrice <= 0.01) return;
-
         const totalItemDiscount = Math.max(0, grossPrice - itemNetPrice);
-        const discountPercent = grossPrice > 0 ? Math.round(totalItemDiscount / grossPrice * 100) : 0;
+        const discountPercent = grossPrice > 0 ? (totalItemDiscount / grossPrice * 100) : 0;
+
+        if (itemNetPrice <= 0.01 || discountPercent >= 99.99) return;
         const discountStr = totalItemDiscount > 0.01 ? `${discountPercent}% (${totalItemDiscount.toFixed(2)} THB)` : "-";
 
         const flowerStrains = [
