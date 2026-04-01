@@ -372,21 +372,32 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
   const month = monthInput?.value;
   const exportBtn = document.getElementById("exportMonthlyBtn");
   const originalBtnText = exportBtn ? exportBtn.innerText : "📦 Export Monthly Excel";
+  const progressContainer = document.getElementById("exportProgressContainer");
+  const progressBar = document.getElementById("exportProgressBar");
+  const progressLabel = document.getElementById("exportProgressLabel");
+  const progressPercent = document.getElementById("exportProgressPercent");
 
   if (!month) {
     window.showMessage("Please select a month first", "warning");
     return;
   }
 
-  const updateProgress = (text) => {
+  const updateProgress = (text, percent) => {
     if (exportBtn) exportBtn.innerText = text;
+    if (progressBar && percent !== undefined) {
+      progressBar.style.width = percent + '%';
+      progressBar.setAttribute('aria-valuenow', percent);
+    }
+    if (progressLabel) progressLabel.innerText = text;
+    if (progressPercent) progressPercent.innerText = (percent || 0) + '%';
     window.showMessage(text, "info");
-    console.log(text);
+    console.log(text + ' - ' + (percent || 0) + '%');
   };
 
   try {
     if (exportBtn) exportBtn.disabled = true;
-    updateProgress(`Preparing for ${month}...`);
+    if (progressContainer) progressContainer.classList.remove('d-none');
+    updateProgress(`Preparing for ${month}...`, 5);
 
     // Get all days in the selected month
     const [year, monthNum] = month.split('-').map(Number);
@@ -409,19 +420,25 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
 
     // Sync missing days from Loyverse to Database
     const missingDays = targetDays.filter(d => !existingDates.has(d));
+    const totalSteps = missingDays.length + targetDays.length + 2;
+    let currentStep = 1;
+    
     for (let i = 0; i < missingDays.length; i++) {
       const dateStr = missingDays[i];
-      updateProgress(`Syncing ${i+1}/${missingDays.length}: ${dateStr}...`);
+      const percent = Math.round((currentStep / totalSteps) * 100);
+      updateProgress(`Syncing ${i+1}/${missingDays.length}: ${dateStr}...`, percent);
       try {
         const syncRes = await fetch(`/api/loyverse/sync?date=${dateStr}`);
         if (syncRes.ok) console.log(`Synced ${dateStr}`);
       } catch (e) {
         console.warn(`Failed to sync ${dateStr}:`, e);
       }
+      currentStep++;
     }
 
     // Now fetch the updated reports list
-    updateProgress("Loading Data...");
+    currentStep++;
+    updateProgress("Loading Data...", Math.round((currentStep / totalSteps) * 100));
     const response = await fetch(`/api/reports`);
     if (!response.ok) throw new Error("Failed to fetch updated reports list");
     const updatedReports = await response.json();
@@ -470,7 +487,8 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
       const report = monthReports[i];
       const dateStr = typeof report.date === 'string' ? report.date.split('T')[0] : new Date(report.date).toISOString().split('T')[0];
       
-      updateProgress(`Adding Day ${i+1}/${monthReports.length}: ${dateStr}...`);
+      const percent = Math.round(((currentStep + i) / totalSteps) * 100);
+      updateProgress(`Adding Day ${i+1}/${monthReports.length}: ${dateStr}...`, percent);
 
       // Fetch details for daily sheet
       let detailedData = null;
@@ -523,10 +541,20 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url; a.download = `BestBuds_Monthly_Detailed_${month}.xlsx`; a.click();
+    updateProgress("✓ Complete!", 100);
+    if (progressBar) progressBar.classList.add('complete');
     window.showMessage("Monthly report exported successfully", "success");
+    
+    // Hide progress bar after 2 seconds
+    setTimeout(() => {
+      if (progressContainer) progressContainer.classList.add('d-none');
+      if (progressBar) progressBar.classList.remove('complete');
+      progressBar.style.width = '0%';
+    }, 2000);
   } catch (error) {
     console.error('Monthly export error:', error);
     window.showMessage(`Error: ${error.message}`, "danger");
+    if (progressContainer) progressContainer.classList.add('d-none');
   } finally {
     if (exportBtn) {
       exportBtn.disabled = false;
