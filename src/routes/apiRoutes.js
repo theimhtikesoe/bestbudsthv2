@@ -13,10 +13,14 @@ const {
   addStaff,
   removeStaff,
   listStaff,
-  eventsHandler
+  eventsHandler,
+  manualDbInit
 } = require('../controllers/reportController');
 
 const router = express.Router();
+
+// Diagnostics
+router.get('/db/init', manualDbInit);
 
 // Real-time events
 router.get('/events', eventsHandler);

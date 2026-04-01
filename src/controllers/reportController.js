@@ -437,7 +437,9 @@ async function addExpense(req, res, next) {
       ? `INSERT INTO daily_expenses (date, category, description, amount, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *`
       : `INSERT INTO daily_expenses (date, category, description, amount, created_at) VALUES (?, ?, ?, ?, NOW())`;
 
+    console.log(`[EXPENSE] Saving expense for ${date}:`, { category, amount: expenseAmount });
     const result = await query(sql, [date, category, description || '', expenseAmount]);
+    console.log(`[EXPENSE] Result:`, result);
 
     // Broadcast update
     broadcast({ type: 'EXPENSE_UPDATE', date });
@@ -447,6 +449,7 @@ async function addExpense(req, res, next) {
       expense: isPostgres ? result[0] : { id: result.insertId, date, category, description, amount: expenseAmount }
     });
   } catch (error) {
+    console.error(`[EXPENSE] Failed to save expense:`, error.message, error.stack);
     return next(error);
   }
 }
@@ -520,7 +523,9 @@ async function addStaff(req, res, next) {
       ? `INSERT INTO daily_staff (date, name) VALUES ($1, $2) RETURNING *`
       : `INSERT INTO daily_staff (date, name) VALUES (?, ?)`;
     
+    console.log(`[STAFF] Saving staff for ${date}:`, { name });
     const result = await query(sql, [date, name]);
+    console.log(`[STAFF] Result:`, result);
 
     broadcast({ type: 'STAFF_UPDATE', date });
 
@@ -529,6 +534,7 @@ async function addStaff(req, res, next) {
       staff: isPostgres ? result[0] : { id: result.insertId, date, name }
     });
   } catch (error) {
+    console.error(`[STAFF] Failed to save staff:`, error.message, error.stack);
     next(error);
   }
 }
@@ -582,7 +588,19 @@ async function listStaff(req, res, next) {
   }
 }
 
+async function manualDbInit(req, res, next) {
+  try {
+    const { initializeSchema } = require('../config/db');
+    await initializeSchema();
+    res.json({ success: true, message: 'Database schema initialized successfully' });
+  } catch (error) {
+    console.error('[DB] Manual initialization failed:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
 module.exports = {
+  manualDbInit,
   eventsHandler,
   syncFromLoyverse,
   getReportByDate,
