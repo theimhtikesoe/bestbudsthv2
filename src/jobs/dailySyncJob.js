@@ -1,6 +1,11 @@
 const cron = require('node-cron');
 const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
 const { query, getDialect } = require('../config/db');
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 const { fetchSalesSummaryByDate } = require('../services/loyverseService');
 const { calculateReportValues, toNumber } = require('../utils/calculations');
 
@@ -75,7 +80,8 @@ async function resolveOpeningCashForDate(date, currentReportOpeningCash) {
 }
 
 async function runDailySync() {
-  const today = dayjs().format('YYYY-MM-DD');
+  const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
+  const today = dayjs().tz(tz).format('YYYY-MM-DD');
   const sales = await fetchSalesSummaryByDate(today);
 
   const existing = await query(`SELECT * FROM daily_reports WHERE date = ${placeholder(1)}`, [today]);

@@ -1,5 +1,10 @@
 const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
 const { query, getDialect } = require('../config/db');
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 const { fetchSalesSummaryByDate } = require('../services/loyverseService');
 const { calculateReportValues, toNumber } = require('../utils/calculations');
 const { calculatePeriodBusinessSummary } = require('../services/settlementService');
@@ -24,7 +29,8 @@ function isValidDate(date) {
     return false;
   }
 
-  const parsed = dayjs(`${date}T00:00:00`);
+  const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
+  const parsed = dayjs.tz(`${date} 00:00:00`, tz);
   return parsed.isValid() && parsed.format('YYYY-MM-DD') === date;
 }
 

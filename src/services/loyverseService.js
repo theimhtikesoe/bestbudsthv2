@@ -30,12 +30,12 @@ function getDateBounds(date) {
   }
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
 
-  // 🛡️ 1-MINUTE SHIFT FIX:
-  // Start exactly at 00:01:00.000 of the selected date
-  // End exactly at 00:00:59.999 of the following day
-  // This ensures midnight (00:00:00) belongs to the PREVIOUS day's report.
-  const startLocal = dayjs.tz(`${date} 00:01:00`, tz);
-  const endLocal = dayjs.tz(`${date} 00:01:00`, tz).add(1, 'day').subtract(1, 'millisecond');
+  // 🛡️ MIDNIGHT BOUNDARY FIX:
+  // Start exactly at 00:00:00.000 of the selected date (Inclusive)
+  // End exactly at 23:59:59.999 of the same date
+  // This ensures midnight (00:00:00) belongs to the NEW day's report, matching Loyverse.
+  const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
+  const endLocal = startLocal.endOf('day');
 
   return {
     startIso: startLocal.utc().format('YYYY-MM-DDTHH:mm:ss.SSS[Z]'),
@@ -501,8 +501,11 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
     const itemTotal = extractLineItemPrice(lineItem);
     const itemGrossTotal = extractLineItemGrossPrice(lineItem);
     
-    // Skip Price 0 items
-    if (itemTotal <= 0.01) continue;
+    // Skip items where price is 0 OR discount is 100%
+    const itemDiscount = Math.max(0, itemGrossTotal - itemTotal);
+    const itemDiscountPercent = itemGrossTotal > 0 ? (itemDiscount / itemGrossTotal * 100) : 0;
+    
+    if (itemTotal <= 0.01 || itemDiscountPercent >= 99.99) continue;
 
     let qty = extractLineItemQty(lineItem);
 
