@@ -48,34 +48,30 @@ function setupRealtimeListener() {
         }
       }
     } catch (error) {
-      console.error('Error processing real-time event:', error, event.data);
+      console.error('SSE parse error:', error);
     }
   };
 
-  eventSource.onerror = (error) => {
-    console.error('SSE connection error:', error);
+  eventSource.onerror = () => {
+    console.warn('SSE connection lost, will retry...');
     eventSource.close();
     eventSource = null;
-    // Reconnect after 5 seconds
-    setTimeout(setupRealtimeListener, 5000);
+    setTimeout(setupRealtimeListener, 3000);
   };
 }
 
-// Initialize real-time listener
-setupRealtimeListener();
-
 /**
- * Fetch expenses from API
+ * Fetch expenses from backend (with fallback to LocalStorage)
  */
 async function fetchExpenses(date) {
   try {
     const response = await fetch(`/api/expenses/${date}`);
-    const data = await response.json();
-    if (data.expenses) {
-      renderExpensesList(data.expenses, date);
-      // Keep local storage as backup/cache
-      localStorage.setItem(`dailyExpenses_${date}`, JSON.stringify(data.expenses));
-      return data.expenses;
+    if (response.ok) {
+      const data = await response.json();
+      const expenses = data.expenses || [];
+      localStorage.setItem(`dailyExpenses_${date}`, JSON.stringify(expenses));
+      renderExpensesList(expenses, date);
+      return expenses;
     }
   } catch (error) {
     console.error('Error fetching expenses:', error);
@@ -88,16 +84,18 @@ async function fetchExpenses(date) {
 }
 
 /**
- * Fetch staff from API
+ * Fetch staff from backend (with fallback to LocalStorage)
  */
 async function fetchStaff(date) {
   try {
     const response = await fetch(`/api/staff/${date}`);
-    const data = await response.json();
-    if (data.staff) {
-      renderClosingStaffList(data.staff, date);
-      // Keep local storage as backup/cache
-      localStorage.setItem(`dailyClosingStaff_${date}`, JSON.stringify(data.staff));
+    if (response.ok) {
+      const data = await response.json();
+      const staff = data.staff || [];
+      localStorage.setItem(`dailyClosingStaff_${date}`, JSON.stringify(staff));
+      if (typeof renderClosingStaffList === 'function') {
+        renderClosingStaffList(staff, date);
+      }
       return data.staff;
     }
   } catch (error) {
@@ -119,6 +117,9 @@ function getLocalExpenses(date) {
   return stored ? JSON.parse(stored) : [];
 }
 
+/**
+ * Get Closing Staff entries
+ */
 function getClosingStaffEntries(date) {
   if (!date) return [];
   const listKey = `dailyClosingStaff_${date}`;
@@ -148,267 +149,7 @@ function getClosingStaff(date) {
 }
 
 /**
- * Render expenses list in UI
- */
-function renderExpensesList(expenses, date) {
-  const container = document.getElementById("expensesList");
-  if (!container) return;
-  if (!expenses || expenses.length === 0) {
-    container.innerHTML = "<p class=\"text-muted\">No expenses recorded</p>";
-    return;
-  }
-  let html = `<div class=\"table-responsive\"><table class=\"table table-sm table-hover align-middle\"><thead class=\"table-dark\"><tr><th>Category</th><th>Description</th><th>Amount</th><th class=\"text-end\">Actions</th></tr></thead><tbody>`;
-  let total = 0;
-  expenses.forEach(expense => {
-    const amount = parseFloat(expense.amount) || 0;
-    total += amount;
-    html += `<tr><td><span class=\"badge bg-secondary\">${expense.category}</span></td><td>${expense.description || "-"}</td><td class=\"fw-bold\">${amount.toLocaleString()} THB</td><td class=\"text-end\"><button class=\"btn btn-xs btn-outline-info me-1\" onclick=\"editExpense(${expense.id}, '${date}')\">Edit</button><button class=\"btn btn-xs btn-outline-danger\" onclick=\"deleteExpense(${expense.id}, '${date}')\">Delete</button></td></tr>`;
-  });
-  html += `</tbody><tfoot class=\"table-light\"><tr class=\"fw-bold\"><td colspan=\"2\">Total Expenses</td><td colspan=\"2\" class=\"text-primary\">${total.toLocaleString()} THB</td></tr></tfoot></table></div>`;
-  container.innerHTML = html;
-}
-
-/**
- * Add or Update expense
- */
-window.addExpenseToReport = async function() {
-  const dateInput = document.getElementById("reportDate");
-  const categorySelect = document.getElementById("expenseCategory");
-  const descriptionInput = document.getElementById("expenseDescription");
-  const amountInput = document.getElementById("expenseAmount");
-  const submitBtn = document.querySelector("#expenseSection button");
-
-  if (submitBtn && submitBtn.disabled) return;
-  if (submitBtn) submitBtn.disabled = true;
-
-  const date = dateInput?.value;
-  const category = categorySelect?.value;
-  const description = descriptionInput?.value || "";
-  const amount = parseFloat(amountInput?.value) || 0;
-
-  if (!date || !category || amount <= 0) {
-    window.showMessage("Please fill in all expense fields", "warning");
-    if (submitBtn) submitBtn.disabled = false;
-    return;
-  }
-
-  try {
-    if (currentEditingExpenseId) {
-      await fetch(`/api/expenses/${currentEditingExpenseId}`, { method: 'DELETE' });
-      currentEditingExpenseId = null;
-      if (submitBtn) submitBtn.textContent = "Add Expense";
-    }
-
-    const response = await fetch('/api/expenses', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date, category, description, amount })
-    });
-
-    if (response.ok) {
-      window.showMessage("Expense saved successfully", "success");
-      if (categorySelect) categorySelect.value = "";
-      if (descriptionInput) descriptionInput.value = "";
-      if (amountInput) amountInput.value = "";
-      // SSE will trigger re-fetch, no manual call here to avoid double-render
-    } else {
-      throw new Error('Failed to save expense');
-    }
-  } catch (error) {
-    window.showMessage(`Error: ${error.message}`, "danger");
-  } finally {
-    if (submitBtn) submitBtn.disabled = false;
-  }
-};
-
-window.editExpense = async function(id, date) {
-  const expenses = getLocalExpenses(date);
-  const expense = expenses.find(e => Number(e.id) === Number(id));
-  if (!expense) return;
-  if (document.getElementById("expenseCategory")) document.getElementById("expenseCategory").value = expense.category;
-  if (document.getElementById("expenseDescription")) document.getElementById("expenseDescription").value = expense.description || "";
-  if (document.getElementById("expenseAmount")) document.getElementById("expenseAmount").value = expense.amount;
-  currentEditingExpenseId = id;
-  const submitBtn = document.querySelector("#expenseSection button");
-  if (submitBtn) submitBtn.textContent = "Update Expense";
-  document.getElementById("expenseSection")?.scrollIntoView({ behavior: "smooth" });
-};
-
-window.deleteExpense = async function(id, date) {
-  if (!confirm("Are you sure you want to delete this expense?")) return;
-  try {
-    const response = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
-    if (response.ok) {
-      window.showMessage("Expense deleted", "success");
-      // SSE will handle refresh
-      if (currentEditingExpenseId === id) {
-          currentEditingExpenseId = null;
-          const submitBtn = document.querySelector("#expenseSection button");
-          if (submitBtn) submitBtn.textContent = "Add Expense";
-      }
-    } else {
-      throw new Error('Failed to delete expense');
-    }
-  } catch (error) {
-    window.showMessage(`Error: ${error.message}`, "danger");
-  }
-};
-
-function renderClosingStaffList(staffEntries, date) {
-  const container = document.getElementById("closingStaffList");
-  if (!container) return;
-
-  if (!Array.isArray(staffEntries) || staffEntries.length === 0) {
-    container.innerHTML = "<p class=\"text-muted mb-0\">No closing staff recorded</p>";
-    return;
-  }
-
-  let html = "<div class=\"table-responsive\"><table class=\"table table-sm table-hover align-middle\"><thead class=\"table-dark\"><tr><th>#</th><th>Name</th><th class=\"text-end\">Actions</th></tr></thead><tbody>";
-  staffEntries.forEach((entry, index) => {
-    html += `<tr>
-      <td>${index + 1}</td>
-      <td class=\"fw-semibold\">${entry.name}</td>
-      <td class=\"text-end\">
-        <button class=\"btn btn-xs btn-outline-info me-1\" onclick=\"editClosingStaff('${entry.id}', '${date}')\">Edit</button>
-        <button class=\"btn btn-xs btn-outline-danger\" onclick=\"deleteClosingStaff('${entry.id}', '${date}')\">Delete</button>
-      </td>
-    </tr>`;
-  });
-  html += "</tbody></table></div>";
-  container.innerHTML = html;
-}
-
-window.addClosingStaffToReport = async function() {
-  const date = document.getElementById("reportDate")?.value;
-  const staffInput = document.getElementById("closingStaff");
-  const addBtn = document.getElementById("addClosingStaffBtn");
-
-  if (addBtn && addBtn.disabled) return;
-  if (addBtn) addBtn.disabled = true;
-
-  const staffName = String(staffInput?.value || "").trim();
-
-  if (!date || !staffName) {
-    window.showMessage("Please fill in staff name", "warning");
-    if (addBtn) addBtn.disabled = false;
-    return;
-  }
-
-  try {
-    if (currentEditingClosingStaffId) {
-      await fetch(`/api/staff/${currentEditingClosingStaffId}`, { method: 'DELETE' });
-      currentEditingClosingStaffId = null;
-      if (addBtn) addBtn.textContent = "➕ Add Closing Staff";
-    }
-
-    const response = await fetch('/api/staff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ date, name: staffName })
-    });
-
-    if (response.ok) {
-      window.showMessage("Staff saved successfully", "success");
-      if (staffInput) staffInput.value = "";
-      // SSE will handle refresh
-    } else {
-      throw new Error('Failed to save staff');
-    }
-  } catch (error) {
-    window.showMessage(`Error: ${error.message}`, "danger");
-  } finally {
-    if (addBtn) addBtn.disabled = false;
-  }
-};
-
-window.editClosingStaff = function(id, date) {
-  const staffInput = document.getElementById("closingStaff");
-  const addBtn = document.getElementById("addClosingStaffBtn");
-  const entries = getClosingStaffEntries(date);
-  const staff = entries.find((entry) => String(entry.id) === String(id));
-  if (!staff || !staffInput) return;
-
-  staffInput.value = staff.name;
-  currentEditingClosingStaffId = staff.id;
-  if (addBtn) addBtn.textContent = "Update Closing Staff";
-  document.getElementById("closingStaffSection")?.scrollIntoView({ behavior: "smooth", block: "start" });
-};
-
-window.deleteClosingStaff = async function(id, date) {
-  if (!confirm("Are you sure you want to delete this staff member?")) return;
-  try {
-    const response = await fetch(`/api/staff/${id}`, { method: 'DELETE' });
-    if (response.ok) {
-      window.showMessage("Staff member removed", "success");
-      // SSE will handle refresh
-      if (String(currentEditingClosingStaffId) === String(id)) {
-        currentEditingClosingStaffId = null;
-        const addBtn = document.getElementById("addClosingStaffBtn");
-        if (addBtn) addBtn.textContent = "➕ Add Closing Staff";
-      }
-    } else {
-      throw new Error('Failed to delete staff');
-    }
-  } catch (error) {
-    window.showMessage(`Error: ${error.message}`, "danger");
-  }
-};
-
-window.loadReportData = async function(date) {
-  fetchExpenses(date);
-  fetchStaff(date);
-  
-  // Fetch persisted report data
-  try {
-    const res = await fetch(`/api/reports/${date}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && data.date) {
-        // Update UI fields if they exist
-        const fields = {
-          'netSale': data.net_sale,
-          'cashTotal': data.cash_total,
-          'cardTotal': data.card_total,
-          'transferTotal': data.transfer_total,
-          'totalOrders': data.total_orders,
-          'tip': data.tip,
-          '1k_qty': data['1k_qty'],
-          'opening_cash': data.opening_cash,
-          'actual_cash_counted': data.actual_cash_counted
-        };
-        
-        for (const [id, val] of Object.entries(fields)) {
-          const el = document.getElementById(id);
-          if (el) el.value = val;
-        }
-        
-        // Update read-only displays
-        const gramsEl = document.getElementById('totalGramsSold');
-        if (gramsEl) gramsEl.innerText = (Number(data.total_grams) || 0).toFixed(3) + ' G';
-        
-        const fbEl = document.getElementById('orderEntriesFbTotal');
-        if (fbEl) fbEl.textContent = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'THB' }).format(data.fb_total || 0);
-        
-        // Trigger any dependent calculations (like difference)
-        if (typeof window.calculateDifference === 'function') window.calculateDifference();
-      }
-    }
-  } catch (e) {
-    console.error("Error loading persisted report:", e);
-  }
-
-  const staffInput = document.getElementById("closingStaff");
-  if (staffInput) {
-    staffInput.value = "";
-    staffInput.placeholder = "Enter name";
-  }
-  currentEditingClosingStaffId = null;
-  const addBtn = document.getElementById("addClosingStaffBtn");
-  if (addBtn) addBtn.textContent = "➕ Add Closing Staff";
-};
-
-/**
- * Full Client-Side Excel Export
+ * Export Daily Report to Excel
  */
 window.exportReportToExcel = async function() {
   const dateInput = document.getElementById("reportDate");
@@ -461,6 +202,12 @@ window.exportReportToExcel = async function() {
     let totalFlowerGrams = 0;
 
     receipts.forEach(receipt => {
+      // Ensure receipt is a valid object
+      if (!receipt || typeof receipt !== 'object') {
+        console.warn('Invalid receipt object:', receipt);
+        return;
+      }
+
       const items = receipt.line_items || receipt.items || [];
       const paymentMethod = (receipt.payments && receipt.payments[0]?.payment_type?.name) || 
                              (receipt.payments && receipt.payments[0]?.name) || "N/A";
@@ -470,6 +217,12 @@ window.exportReportToExcel = async function() {
       const orderTotal = getMoney(receipt.total_money, receipt.amount) || 0;
 
       items.forEach(item => {
+        // Ensure item is a valid object
+        if (!item || typeof item !== 'object') {
+          console.warn('Invalid item object:', item);
+          return;
+        }
+
         let itemName = String(item.name || "").toLowerCase();
         let category = String(item.category_name || "").toLowerCase();
         let qty = Number(item.quantity || 0);
@@ -520,7 +273,7 @@ window.exportReportToExcel = async function() {
 
         const exportItem = {
           type: exportType,
-          name: item.name,
+          name: item.name || "",
           qty: (isMain && !isThcGummy && !isLobbyShirt) ? "-" : qty,
           gram: (isMain && !isThcGummy && !isLobbyShirt) ? `${qty.toFixed(3)} G` : "-",
           unitPrice: grossPrice / (qty || 1),
@@ -536,6 +289,11 @@ window.exportReportToExcel = async function() {
         }
       });
     });
+
+    // Ensure ExcelJS is available
+    if (typeof ExcelJS === 'undefined') {
+      throw new Error('ExcelJS library not loaded. Please refresh the page and try again.');
+    }
 
     const workbook = new ExcelJS.Workbook();
     const sheet = workbook.addWorksheet("Daily Report");
@@ -634,6 +392,186 @@ window.exportReportToExcel = async function() {
     a.href = url; a.download = `BestBuds_Report_${date}.xlsx`; a.click();
     window.showMessage("Exported successfully", "success");
   } catch (error) {
+    console.error('Export error:', error);
     window.showMessage(`Export Error: ${error.message}`, "danger");
   }
 };
+
+/**
+ * Render expenses list
+ */
+function renderExpensesList(expenses, date) {
+  const container = document.getElementById('expensesList');
+  if (!container) return;
+
+  container.innerHTML = '';
+  if (!expenses || expenses.length === 0) {
+    container.innerHTML = '<p class="text-muted">No expenses added</p>';
+    return;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'list-group';
+  expenses.forEach((exp) => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.innerHTML = `
+      <div>
+        <strong>${exp.category}</strong>
+        ${exp.description ? `<br><small class="text-muted">${exp.description}</small>` : ''}
+      </div>
+      <div class="text-end">
+        <span class="badge bg-primary">THB ${Number(exp.amount || 0).toFixed(2)}</span>
+        <button class="btn btn-sm btn-danger ms-2" onclick="removeExpense(${exp.id}, '${date}')">Remove</button>
+      </div>
+    `;
+    list.appendChild(li);
+  });
+  container.appendChild(list);
+}
+
+/**
+ * Remove expense
+ */
+async function removeExpense(id, date) {
+  try {
+    const response = await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+    if (response.ok) {
+      window.showMessage('Expense removed', 'success');
+      fetchExpenses(date);
+    }
+  } catch (error) {
+    console.error('Error removing expense:', error);
+    window.showMessage('Error removing expense', 'danger');
+  }
+}
+
+/**
+ * Add expense to report
+ */
+window.addExpenseToReport = async function() {
+  const dateInput = document.getElementById('reportDate');
+  const categorySelect = document.getElementById('expenseCategory');
+  const descriptionInput = document.getElementById('expenseDescription');
+  const amountInput = document.getElementById('expenseAmount');
+
+  const date = dateInput?.value;
+  const category = categorySelect?.value;
+  const description = descriptionInput?.value || '';
+  const amount = amountInput?.value;
+
+  if (!date || !category || !amount) {
+    window.showMessage('Please fill in all required fields', 'warning');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/expenses', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, category, description, amount: Number(amount) })
+    });
+
+    if (response.ok) {
+      window.showMessage('Expense added', 'success');
+      amountInput.value = '';
+      descriptionInput.value = '';
+      categorySelect.value = '';
+      fetchExpenses(date);
+    } else {
+      const error = await response.json();
+      window.showMessage(error.message || 'Error adding expense', 'danger');
+    }
+  } catch (error) {
+    console.error('Error adding expense:', error);
+    window.showMessage('Error adding expense', 'danger');
+  }
+};
+
+/**
+ * Render closing staff list
+ */
+function renderClosingStaffList(staff, date) {
+  const container = document.getElementById('closingStaffList');
+  if (!container) return;
+
+  container.innerHTML = '';
+  if (!staff || staff.length === 0) {
+    container.innerHTML = '<p class="text-muted">No staff added</p>';
+    return;
+  }
+
+  const list = document.createElement('ul');
+  list.className = 'list-group';
+  staff.forEach((s) => {
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex justify-content-between align-items-center';
+    li.innerHTML = `
+      <span>${s.name}</span>
+      <button class="btn btn-sm btn-danger" onclick="removeClosingStaff(${s.id}, '${date}')">Remove</button>
+    `;
+    list.appendChild(li);
+  });
+  container.appendChild(list);
+}
+
+/**
+ * Remove closing staff
+ */
+async function removeClosingStaff(id, date) {
+  try {
+    const response = await fetch(`/api/staff/${id}`, { method: 'DELETE' });
+    if (response.ok) {
+      window.showMessage('Staff removed', 'success');
+      fetchStaff(date);
+    }
+  } catch (error) {
+    console.error('Error removing staff:', error);
+    window.showMessage('Error removing staff', 'danger');
+  }
+}
+
+/**
+ * Add closing staff to report
+ */
+window.addClosingStaffToReport = async function() {
+  const dateInput = document.getElementById('reportDate');
+  const staffInput = document.getElementById('closingStaff');
+
+  const date = dateInput?.value;
+  const name = staffInput?.value?.trim();
+
+  if (!date || !name) {
+    window.showMessage('Please enter staff name', 'warning');
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/staff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, name })
+    });
+
+    if (response.ok) {
+      window.showMessage('Staff added', 'success');
+      staffInput.value = '';
+      fetchStaff(date);
+    } else {
+      const error = await response.json();
+      window.showMessage(error.message || 'Error adding staff', 'danger');
+    }
+  } catch (error) {
+    console.error('Error adding staff:', error);
+    window.showMessage('Error adding staff', 'danger');
+  }
+};
+
+// Initialize on page load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    setupRealtimeListener();
+  });
+} else {
+  setupRealtimeListener();
+}
