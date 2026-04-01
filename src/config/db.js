@@ -26,6 +26,21 @@ const DAILY_REPORTS_REQUIRED_COLUMNS = [
     name: 'safe_box_amount',
     mysqlDefinition: 'DECIMAL(12,2) NOT NULL DEFAULT 0',
     postgresDefinition: 'NUMERIC(12,2) NOT NULL DEFAULT 0'
+  },
+  {
+    name: 'transfer_total',
+    mysqlDefinition: 'DECIMAL(12,2) NOT NULL DEFAULT 0',
+    postgresDefinition: 'NUMERIC(12,2) NOT NULL DEFAULT 0'
+  },
+  {
+    name: 'total_grams',
+    mysqlDefinition: 'DECIMAL(12,3) NOT NULL DEFAULT 0',
+    postgresDefinition: 'NUMERIC(12,3) NOT NULL DEFAULT 0'
+  },
+  {
+    name: 'fb_total',
+    mysqlDefinition: 'DECIMAL(12,2) NOT NULL DEFAULT 0',
+    postgresDefinition: 'NUMERIC(12,2) NOT NULL DEFAULT 0'
   }
 ];
 
