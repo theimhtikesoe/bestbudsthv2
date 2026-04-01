@@ -394,11 +394,8 @@ window.exportReportToExcel = async function() {
     currRow++;
     paintSection("Daily Summary Dashboard");
     
-    // Calculate F&B Total from all F&B items
-    const fbTotal = fbItems.reduce((a, b) => {
-      const val = Number(b.netPrice);
-      return a + (isNaN(val) || val <= 0.01 ? 0 : val);
-    }, 0);
+    // Use F&B Total directly from synced data to match UI
+    const fbTotal = Number(rawData.fb_total || 0);
     
     // Calculate Main/Accessories Total from flower items
     const mainAccTotal = flowerItems.reduce((a, b) => {
@@ -407,7 +404,7 @@ window.exportReportToExcel = async function() {
     }, 0);
     
     const summaryData = [
-      ["Total Grams Sold", "", "", `${totalFlowerGrams.toFixed(3)} G`],
+      ["Total Grams Sold", "", "", `${Number(rawData.total_grams || 0).toFixed(3)} G`],
       ["Cash In", "", "", `${cashTotal.toFixed(0)} THB`],
       ["Card In", "", "", `${cardTotal.toFixed(0)} THB`],
       ["Transfer In", "", "", `${transferTotal.toFixed(0)} THB`],
