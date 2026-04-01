@@ -102,7 +102,10 @@ async function runDailySync() {
     calculated.net_sale,
     calculated.cash_total,
     calculated.card_total,
+    sales.transfer_total || 0,
     sales.total_orders,
+    sales.total_grams || 0,
+    sales.fb_total || 0,
     toNumber(existingReport.expense),
     toNumber(existingReport.tip),
     toNonNegativeInteger(existingReport['1k_qty']),
@@ -124,7 +127,10 @@ async function runDailySync() {
         net_sale,
         cash_total,
         card_total,
+        transfer_total,
         total_orders,
+        total_grams,
+        fb_total,
         expense,
         tip,
         ${oneKQtyColumn()},
@@ -135,12 +141,15 @@ async function runDailySync() {
         actual_cash_counted,
         expected_cash,
         difference
-      ) VALUES (${placeholder(1)}, ${placeholder(2)}, ${placeholder(3)}, ${placeholder(4)}, ${placeholder(5)}, ${placeholder(6)}, ${placeholder(7)}, ${placeholder(8)}, ${placeholder(9)}, ${placeholder(10)}, ${placeholder(11)}, ${placeholder(12)}, ${placeholder(13)}, ${placeholder(14)}, ${placeholder(15)})
+      ) VALUES (${placeholder(1)}, ${placeholder(2)}, ${placeholder(3)}, ${placeholder(4)}, ${placeholder(5)}, ${placeholder(6)}, ${placeholder(7)}, ${placeholder(8)}, ${placeholder(9)}, ${placeholder(10)}, ${placeholder(11)}, ${placeholder(12)}, ${placeholder(13)}, ${placeholder(14)}, ${placeholder(15)}, ${placeholder(16)}, ${placeholder(17)}, ${placeholder(18)})
       ON CONFLICT (date) DO UPDATE SET
         net_sale = EXCLUDED.net_sale,
         cash_total = EXCLUDED.cash_total,
         card_total = EXCLUDED.card_total,
+        transfer_total = EXCLUDED.transfer_total,
         total_orders = EXCLUDED.total_orders,
+        total_grams = EXCLUDED.total_grams,
+        fb_total = EXCLUDED.fb_total,
         expense = EXCLUDED.expense,
         tip = EXCLUDED.tip,
         ${oneKQtyColumn()} = EXCLUDED.${oneKQtyColumn()},
@@ -163,7 +172,10 @@ async function runDailySync() {
       net_sale,
       cash_total,
       card_total,
+      transfer_total,
       total_orders,
+      total_grams,
+      fb_total,
       expense,
       tip,
       ${oneKQtyColumn()},
@@ -174,12 +186,15 @@ async function runDailySync() {
       actual_cash_counted,
       expected_cash,
       difference
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON DUPLICATE KEY UPDATE
       net_sale = VALUES(net_sale),
       cash_total = VALUES(cash_total),
       card_total = VALUES(card_total),
+      transfer_total = VALUES(transfer_total),
       total_orders = VALUES(total_orders),
+      total_grams = VALUES(total_grams),
+      fb_total = VALUES(fb_total),
       expense = VALUES(expense),
       tip = VALUES(tip),
       ${oneKQtyColumn()} = VALUES(${oneKQtyColumn()}),
