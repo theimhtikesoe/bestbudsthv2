@@ -1300,6 +1300,8 @@ async function fetchSalesSummaryByDate(date) {
     transfer_total: totals.total_transfer,
     net_sale: netSale,
     total_orders: totals.total_orders,
+    total_grams: automatedReport.totals.total_gram_qty,
+    fb_total: automatedReport.totals.total_denominator_price,
     unclassified_amount: roundCurrency(totals.unclassified_amount),
     cash_entries: totals.cash_entries,
     card_entries: totals.card_entries,

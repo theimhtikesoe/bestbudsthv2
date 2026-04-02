@@ -443,18 +443,14 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
     if (!response.ok) throw new Error("Failed to fetch updated reports list");
     const updatedReports = await response.json();
     
-    const monthReports = updatedReports
-      .filter(report => {
-        const rDate = typeof report.date === 'string' ? report.date : new Date(report.date).toISOString();
-        return rDate.startsWith(month);
-      })
-      .sort((a, b) => {
-        const da = typeof a.date === 'string' ? a.date : new Date(a.date).toISOString();
-        const db = typeof b.date === 'string' ? b.date : new Date(b.date).toISOString();
-        return da.localeCompare(db);
-      });
+    // Build a lookup map from date string -> report object
+    const reportByDate = new Map();
+    updatedReports.forEach(report => {
+      const rDate = typeof report.date === 'string' ? report.date.split('T')[0] : new Date(report.date).toISOString().split('T')[0];
+      if (rDate.startsWith(month)) reportByDate.set(rDate, report);
+    });
 
-    if (monthReports.length === 0) {
+    if (reportByDate.size === 0 && targetDays.length === 0) {
       window.showMessage("No data found for this month.", "warning");
       return;
     }
@@ -483,12 +479,13 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
     let totalGrams = 0, totalCash = 0, totalCard = 0, totalTransfer = 0, totalFb = 0, totalNet = 0;
     let sRow = 4;
 
-    for (let i = 0; i < monthReports.length; i++) {
-      const report = monthReports[i];
-      const dateStr = typeof report.date === 'string' ? report.date.split('T')[0] : new Date(report.date).toISOString().split('T')[0];
+    // Iterate over ALL days in the month (not just days with data)
+    for (let i = 0; i < targetDays.length; i++) {
+      const dateStr = targetDays[i];
+      const report = reportByDate.get(dateStr) || null;
       
       const percent = Math.round(((currentStep + i) / totalSteps) * 100);
-      updateProgress(`Adding Day ${i+1}/${monthReports.length}: ${dateStr}...`, percent);
+      updateProgress(`Adding Day ${i+1}/${targetDays.length}: ${dateStr}...`, percent);
 
       // Fetch details for daily sheet
       let detailedData = null;
@@ -501,12 +498,13 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
       const expenses = expRes.ok ? (await expRes.json()).expenses : [];
       const staff = getClosingStaff(dateStr) || "N/A";
 
-      const grams = Number(report.total_grams || 0);
-      const cash = Number(report.cash_total || 0);
-      const card = Number(report.card_total || 0);
-      const transfer = Number(report.transfer_total || 0);
-      const fb = Number(report.fb_total || 0);
-      const net = Number(report.net_sale || 0);
+      // Use report data if available, otherwise default to 0
+      const grams = Number((report && report.total_grams) || 0);
+      const cash = Number((report && report.cash_total) || 0);
+      const card = Number((report && report.card_total) || 0);
+      const transfer = Number((report && report.transfer_total) || 0);
+      const fb = Number((report && report.fb_total) || 0);
+      const net = Number((report && report.net_sale) || 0);
 
       totalGrams += grams; totalCash += cash; totalCard += card; totalTransfer += transfer; totalFb += fb; totalNet += net;
 
@@ -522,7 +520,7 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
       const sheetName = dateStr.split('-').reverse().join('.');
       const daySheet = workbook.addWorksheet(sheetName);
       const { flowerItems, fbItems, totalFlowerGrams } = processItemsForExcel(detailedData?.orders || detailedData?.receipts || []);
-      paintDailySheet(daySheet, dateStr, staff, detailedData || report, expenses, flowerItems, fbItems, totalFlowerGrams);
+      paintDailySheet(daySheet, dateStr, staff, detailedData || report || { date: dateStr }, expenses, flowerItems, fbItems, totalFlowerGrams);
       
       // Small delay to keep UI responsive
       await new Promise(r => setTimeout(r, 10));
