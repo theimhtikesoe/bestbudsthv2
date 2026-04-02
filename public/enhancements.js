@@ -637,18 +637,34 @@ function renderExpensesList(expenses, date) {
 }
 
 window.addExpenseToReport = async function() {
+  const btn = event?.currentTarget || document.querySelector('#expenseSection button.btn-success');
+  if (btn && btn.disabled) return;
+  
   const date = document.getElementById('reportDate')?.value;
   const cat = document.getElementById('expenseCategory')?.value;
   const desc = document.getElementById('expenseDescription')?.value;
-  const amt = document.getElementById('expenseAmount')?.value;
+  const amtInput = document.getElementById('expenseAmount');
+  const amt = amtInput?.value;
+  
   if (!date || !cat || !amt) return window.showMessage('Fill all fields', 'warning');
+  
+  if (btn) btn.disabled = true;
   try {
     const res = await fetch('/api/expenses', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date, category: cat, description: desc, amount: Number(amt) })
     });
-    if (res.ok) { window.showMessage('Added', 'success'); fetchExpenses(date); }
-  } catch (e) {}
+    if (res.ok) { 
+      window.showMessage('Added', 'success'); 
+      if (amtInput) amtInput.value = '';
+      if (document.getElementById('expenseDescription')) document.getElementById('expenseDescription').value = '';
+      fetchExpenses(date); 
+    }
+  } catch (e) {
+    console.error('Add expense error:', e);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 };
 
 async function removeExpense(id, date) {
@@ -671,16 +687,30 @@ function renderClosingStaffList(staff, date) {
 }
 
 window.addClosingStaffToReport = async function() {
+  const btn = event?.currentTarget || document.getElementById('addClosingStaffBtn');
+  if (btn && btn.disabled) return;
+
   const date = document.getElementById('reportDate')?.value;
-  const name = document.getElementById('closingStaff')?.value;
+  const nameInput = document.getElementById('closingStaff');
+  const name = nameInput?.value;
+  
   if (!date || !name) return;
+  
+  if (btn) btn.disabled = true;
   try {
     const res = await fetch('/api/staff', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ date, name })
     });
-    if (res.ok) { document.getElementById('closingStaff').value = ''; fetchStaff(date); }
-  } catch (e) {}
+    if (res.ok) { 
+      if (nameInput) nameInput.value = ''; 
+      fetchStaff(date); 
+    }
+  } catch (e) {
+    console.error('Add staff error:', e);
+  } finally {
+    if (btn) btn.disabled = false;
+  }
 };
 
 async function removeClosingStaff(id, date) {
