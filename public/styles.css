@@ -170,6 +170,40 @@ body {
     height: 28px;
     font-size: 0.9rem;
   }
+  
+  /* UI Layout Adjustments for Mobile */
+  .action-btn-row > div {
+    margin-bottom: 0.5rem;
+  }
+  
+  .summary-metrics-row > div {
+    width: 50%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .manual-inputs-row > div {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+  
+  .detail-box {
+    min-height: auto !important;
+    margin-bottom: 1rem;
+  }
+  
+  .payment-details-row > div {
+    margin-bottom: 1rem;
+  }
+  
+  .card-body {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .summary-metrics-row > div {
+    width: 33.33%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -436,9 +470,15 @@ body {
 .detail-list {
   margin: 0;
   padding: 10px 18px 14px 18px;
-  max-height: 230px;
+  max-height: 300px;
   overflow-y: auto;
   list-style: none;
+}
+
+@media (max-width: 576px) {
+  .detail-list {
+    max-height: none;
+  }
 }
 
 .detail-list li {
@@ -500,7 +540,12 @@ body {
   border: 1px solid #e5d5bc;
   border-radius: 0.75rem;
   background: #fdf8ee;
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+#bestBudsSalesTable, #reportsTable {
+  min-width: 800px;
 }
 
 #bestBudsSalesTable thead th {

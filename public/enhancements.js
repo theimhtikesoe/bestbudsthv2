@@ -227,15 +227,15 @@ function processItemsForExcel(receipts) {
 function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems, fbItems, totalFlowerGrams) {
   sheet.properties.defaultRowHeight = 22;
   sheet.columns = [
-    { key: 'type', width: 15 },
-    { key: 'name', width: 35 },
+    { key: 'type', width: 18 },
+    { key: 'name', width: 40 },
     { key: 'qty', width: 10 },
     { key: 'gram', width: 12 },
     { key: 'unitPrice', width: 15 },
-    { key: 'discount', width: 15 },
+    { key: 'discount', width: 12 },
     { key: 'netPrice', width: 15 },
     { key: 'payment', width: 15 },
-    { key: 'note', width: 25 }
+    { key: 'note', width: 30 }
   ];
 
   const border = { top: { style: "thin", color: { argb: "FFD5B68A" } }, left: { style: "thin", color: { argb: "FFD5B68A" } }, bottom: { style: "thin", color: { argb: "FFD5B68A" } }, right: { style: "thin", color: { argb: "FFD5B68A" } } };
@@ -284,7 +284,7 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
     rowValues.forEach((v, idx) => {
       const c = sheet.getCell(currRow, idx + 1);
       c.value = v; c.fill = i % 2 === 0 ? rowLight : rowDark; c.border = border;
-      c.alignment = { vertical: 'middle' };
+      c.alignment = { vertical: 'middle', wrapText: true };
       if (idx === 4 || idx === 6) c.numFmt = '#,##0.00';
     });
     currRow++;
@@ -329,6 +329,7 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
     rowValues.forEach((v, idx) => {
       const c = sheet.getCell(currRow, idx + 1);
       c.value = v; c.fill = i % 2 === 0 ? rowLight : rowDark; c.border = border;
+      c.alignment = { vertical: 'middle', wrapText: true };
       if (idx === 2 || idx === 3) c.numFmt = '#,##0.00';
     });
     calculatedFbTotal += item.netPrice;
@@ -465,7 +466,15 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
     
     // Summary Sheet
     const summarySheet = workbook.addWorksheet("Monthly Summary");
-    summarySheet.columns = [{ width: 15 }, { width: 20 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }, { width: 15 }];
+    summarySheet.columns = [
+      { width: 18 }, // Date
+      { width: 22 }, // Flower (grams)
+      { width: 18 }, // Cash In
+      { width: 18 }, // Card In
+      { width: 18 }, // Transfer In
+      { width: 18 }, // F&B Total
+      { width: 18 }  // Net Sales
+    ];
     const border = { top: { style: "thin", color: { argb: "FFD5B68A" } }, left: { style: "thin", color: { argb: "FFD5B68A" } }, bottom: { style: "thin", color: { argb: "FFD5B68A" } }, right: { style: "thin", color: { argb: "FFD5B68A" } } };
     const titleFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF2A2010" } };
     const headerFill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1D8AC" } };
@@ -518,6 +527,7 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
       rowValues.forEach((v, i) => {
         const c = summarySheet.getCell(sRow, i + 1);
         c.value = v; c.border = border;
+        c.alignment = { vertical: 'middle', wrapText: true };
         if (i > 0) c.numFmt = (i === 1) ? '#,##0.000' : '#,##0.00';
       });
       sRow++;
