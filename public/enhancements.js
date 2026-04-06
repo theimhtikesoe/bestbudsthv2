@@ -79,6 +79,11 @@ async function fetchExpenses(date) {
       renderExpensesList(expenses, date);
       return expenses;
     }
+    // Fallback for non-ok response
+    console.warn(`Fetch expenses failed with status ${response.status}. Falling back to local storage.`);
+    const local = getLocalExpenses(date);
+    renderExpensesList(local, date);
+    return local;
   } catch (error) {
     console.error('Error fetching expenses:', error);
     const local = getLocalExpenses(date);
@@ -103,6 +108,11 @@ async function fetchStaff(date) {
       }
       return data.staff;
     }
+    // Fallback for non-ok response
+    console.warn(`Fetch staff failed with status ${response.status}. Falling back to local storage.`);
+    const local = getClosingStaffEntries(date);
+    renderClosingStaffList(local, date);
+    return local;
   } catch (error) {
     console.error('Error fetching staff:', error);
     const local = getClosingStaffEntries(date);
