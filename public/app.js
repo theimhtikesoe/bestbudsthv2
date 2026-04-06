@@ -401,14 +401,15 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
       groupedPayments.set(key, {
         grams: entry.gramShare || 0,
         discount: entry.discountPercentage,
-        cash: 0,
-        transfer: 0,
-        card: 0,
+        cash: { main: 0, fb: 0 },
+        transfer: { main: 0, fb: 0 },
+        card: { main: 0, fb: 0 },
         time: entry.time
       });
     }
     const group = groupedPayments.get(key);
-    group[type] += entry.amount;
+    group[type].main += entry.mainAccTotal || 0;
+    group[type].fb += entry.fbTotal || 0;
     // Update grams if this entry has a higher gram share (prorated grams are same per receipt anyway)
     if (entry.gramShare > group.grams) group.grams = entry.gramShare;
     if (entry.discountPercentage && !group.discount) group.discount = entry.discountPercentage;
@@ -424,9 +425,18 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
 
   let html = '';
   let totalGrams = 0;
-  let totalCash = 0;
-  let totalTransfer = 0;
-  let totalCard = 0;
+  let totalCashMain = 0;
+  let totalCashFb = 0;
+  let totalTransferMain = 0;
+  let totalTransferFb = 0;
+  let totalCardMain = 0;
+  let totalCardFb = 0;
+
+  const formatPriceSplit = (main, fb) => {
+    if (main <= 0 && fb <= 0) return '-';
+    if (fb <= 0) return formatCompactNumber(main);
+    return `${formatCompactNumber(main)} / ${formatCompactNumber(fb)}`;
+  };
 
   if (sortedGroups.length === 0) {
     html = '<tr><td colspan="5" class="text-center py-4 text-muted">No payment data found</td></tr>';
@@ -434,17 +444,20 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
   } else {
     sortedGroups.forEach(g => {
       totalGrams += g.grams;
-      totalCash += g.cash;
-      totalTransfer += g.transfer;
-      totalCard += g.card;
+      totalCashMain += g.cash.main;
+      totalCashFb += g.cash.fb;
+      totalTransferMain += g.transfer.main;
+      totalTransferFb += g.transfer.fb;
+      totalCardMain += g.card.main;
+      totalCardFb += g.card.fb;
 
       html += `
         <tr>
           <td class="text-center">${g.grams > 0 ? formatGramCompact(g.grams) : '-'}</td>
           <td class="text-center">${g.discount ? formatPercentage(g.discount) : '-'}</td>
-          <td class="text-end">${g.cash > 0 ? formatCompactNumber(g.cash) : '-'}</td>
-          <td class="text-end">${g.transfer > 0 ? formatCompactNumber(g.transfer) : '-'}</td>
-          <td class="text-end">${g.card > 0 ? formatCompactNumber(g.card) : '-'}</td>
+          <td class="text-end">${formatPriceSplit(g.cash.main, g.cash.fb)}</td>
+          <td class="text-end">${formatPriceSplit(g.transfer.main, g.transfer.fb)}</td>
+          <td class="text-end">${formatPriceSplit(g.card.main, g.card.fb)}</td>
         </tr>
       `;
     });
@@ -452,9 +465,9 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
     if (els.unifiedPaymentFooter) {
       els.unifiedPaymentFooter.classList.remove('d-none');
       if (els.totalGramsCol) els.totalGramsCol.textContent = totalGrams.toFixed(3);
-      if (els.totalCashCol) els.totalCashCol.textContent = formatCompactNumber(totalCash);
-      if (els.totalTransferCol) els.totalTransferCol.textContent = formatCompactNumber(totalTransfer);
-      if (els.totalCardCol) els.totalCardCol.textContent = formatCompactNumber(totalCard);
+      if (els.totalCashCol) els.totalCashCol.textContent = formatPriceSplit(totalCashMain, totalCashFb);
+      if (els.totalTransferCol) els.totalTransferCol.textContent = formatPriceSplit(totalTransferMain, totalTransferFb);
+      if (els.totalCardCol) els.totalCardCol.textContent = formatPriceSplit(totalCardMain, totalCardFb);
       
       const discountTotal = round2(parseNumber(data?.total_discount)) || discountEntries.reduce((s, e) => s + e.amount, 0);
       if (els.totalDiscountCol) els.totalDiscountCol.textContent = discountTotal > 0 ? formatCompactNumber(discountTotal) : '-';
