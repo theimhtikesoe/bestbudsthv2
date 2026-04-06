@@ -376,7 +376,7 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
   const netSale = Number(rawData.net_sale || 0);
   
   const summaryData = [
-    ["Flower Sales (grams)", Number(rawData.total_grams || totalFlowerGrams || 0)],
+    ["Flower Sales (grams)", Number(totalFlowerGrams || rawData.total_grams || 0)],
     ["Cash In", cashTotal],
     ["Card In", cardTotal],
     ["Transfer In", transferTotal],
