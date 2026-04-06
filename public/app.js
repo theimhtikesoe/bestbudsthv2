@@ -378,6 +378,7 @@ function attachDiscountPercentage(entries, discountEntries) {
 
 function applyPaymentDetails(data, receiptGramMap = new Map()) {
   const discountEntries = normalizeEntries(Array.isArray(data?.discount_entry_details) && data.discount_entry_details.length ? data.discount_entry_details : data?.discount_entries || []);
+  
   const cashEntries = attachDiscountPercentage(
     attachGramShare(sortEntriesByTimeAsc(normalizeEntries(data?.cash_entries || [])), receiptGramMap),
     discountEntries
@@ -391,20 +392,76 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
     discountEntries
   );
 
-  renderEntryList(els.cashEntriesList, cashEntries, { showGram: true, showDiscount: true });
-  renderEntryList(els.cardEntriesList, cardEntries, { showGram: true, showDiscount: true });
-  renderEntryList(els.transferEntriesList, transferEntries, { showGram: true, showDiscount: true });
-  renderEntryList(els.discountEntriesList, discountEntries, { showPercentage: true, percentageOnly: true });
+  // Group entries by receipt number or time to create a unified view
+  const groupedPayments = new Map();
 
-  const cashTotal = cashEntries.reduce((s, e) => s + e.amount, 0);
-  const cardTotal = cardEntries.reduce((s, e) => s + e.amount, 0);
-  const transferTotal = transferEntries.reduce((s, e) => s + e.amount, 0);
-  const discountTotal = round2(parseNumber(data?.total_discount)) || discountEntries.reduce((s, e) => s + e.amount, 0);
+  const addToGroup = (entry, type) => {
+    const key = entry.receiptNumber || `time-${entry.time}`;
+    if (!groupedPayments.has(key)) {
+      groupedPayments.set(key, {
+        grams: entry.gramShare || 0,
+        discount: entry.discountPercentage,
+        cash: 0,
+        transfer: 0,
+        card: 0,
+        time: entry.time
+      });
+    }
+    const group = groupedPayments.get(key);
+    group[type] += entry.amount;
+    // Update grams if this entry has a higher gram share (prorated grams are same per receipt anyway)
+    if (entry.gramShare > group.grams) group.grams = entry.gramShare;
+    if (entry.discountPercentage && !group.discount) group.discount = entry.discountPercentage;
+  };
 
-  if (els.cashEntriesTotal) els.cashEntriesTotal.textContent = formatCurrency(cashTotal);
-  if (els.cardEntriesTotal) els.cardEntriesTotal.textContent = formatCurrency(cardTotal);
-  if (els.transferEntriesTotal) els.transferEntriesTotal.textContent = formatCurrency(transferTotal);
-  if (els.discountEntriesTotal) els.discountEntriesTotal.textContent = formatCurrency(discountTotal);
+  cashEntries.forEach(e => addToGroup(e, 'cash'));
+  transferEntries.forEach(e => addToGroup(e, 'transfer'));
+  cardEntries.forEach(e => addToGroup(e, 'card'));
+
+  const sortedGroups = Array.from(groupedPayments.values()).sort((a, b) => {
+    return new Date(a.time).getTime() - new Date(b.time).getTime();
+  });
+
+  let html = '';
+  let totalGrams = 0;
+  let totalCash = 0;
+  let totalTransfer = 0;
+  let totalCard = 0;
+
+  if (sortedGroups.length === 0) {
+    html = '<tr><td colspan="5" class="text-center py-4 text-muted">No payment data found</td></tr>';
+    if (els.unifiedPaymentFooter) els.unifiedPaymentFooter.classList.add('d-none');
+  } else {
+    sortedGroups.forEach(g => {
+      totalGrams += g.grams;
+      totalCash += g.cash;
+      totalTransfer += g.transfer;
+      totalCard += g.card;
+
+      html += `
+        <tr>
+          <td class="text-center">${g.grams > 0 ? formatGramCompact(g.grams) : '-'}</td>
+          <td class="text-center">${g.discount ? formatPercentage(g.discount) : '-'}</td>
+          <td class="text-end">${g.cash > 0 ? formatCompactNumber(g.cash) : '-'}</td>
+          <td class="text-end">${g.transfer > 0 ? formatCompactNumber(g.transfer) : '-'}</td>
+          <td class="text-end">${g.card > 0 ? formatCompactNumber(g.card) : '-'}</td>
+        </tr>
+      `;
+    });
+
+    if (els.unifiedPaymentFooter) {
+      els.unifiedPaymentFooter.classList.remove('d-none');
+      if (els.totalGramsCol) els.totalGramsCol.textContent = totalGrams.toFixed(3);
+      if (els.totalCashCol) els.totalCashCol.textContent = formatCompactNumber(totalCash);
+      if (els.totalTransferCol) els.totalTransferCol.textContent = formatCompactNumber(totalTransfer);
+      if (els.totalCardCol) els.totalCardCol.textContent = formatCompactNumber(totalCard);
+      
+      const discountTotal = round2(parseNumber(data?.total_discount)) || discountEntries.reduce((s, e) => s + e.amount, 0);
+      if (els.totalDiscountCol) els.totalDiscountCol.textContent = discountTotal > 0 ? formatCompactNumber(discountTotal) : '-';
+    }
+  }
+
+  if (els.unifiedPaymentBody) els.unifiedPaymentBody.innerHTML = html;
 }
 
 /**
@@ -978,14 +1035,13 @@ const els = {
   totalOrders: document.getElementById('totalOrders'),
   totalGramsSold: document.getElementById('totalGramsSold'),
   orderEntriesFbTotal: document.getElementById('orderEntriesFbTotal'),
-  cashEntriesTotal: document.getElementById('cashEntriesTotal'),
-  cardEntriesTotal: document.getElementById('cardEntriesTotal'),
-  transferEntriesTotal: document.getElementById('transferEntriesTotal'),
-  discountEntriesTotal: document.getElementById('discountEntriesTotal'),
-  cashEntriesList: document.getElementById('cashEntriesList'),
-  cardEntriesList: document.getElementById('cardEntriesList'),
-  transferEntriesList: document.getElementById('transferEntriesList'),
-  discountEntriesList: document.getElementById('discountEntriesList')
+  unifiedPaymentBody: document.getElementById('unifiedPaymentBody'),
+  unifiedPaymentFooter: document.getElementById('unifiedPaymentFooter'),
+  totalGramsCol: document.getElementById('totalGramsCol'),
+  totalDiscountCol: document.getElementById('totalDiscountCol'),
+  totalCashCol: document.getElementById('totalCashCol'),
+  totalTransferCol: document.getElementById('totalTransferCol'),
+  totalCardCol: document.getElementById('totalCardCol')
 };
 
 function init() {
@@ -1006,14 +1062,13 @@ function init() {
   els.totalOrders = document.getElementById('totalOrders');
   els.totalGramsSold = document.getElementById('totalGramsSold');
   els.orderEntriesFbTotal = document.getElementById('orderEntriesFbTotal');
-  els.cashEntriesTotal = document.getElementById('cashEntriesTotal');
-  els.cardEntriesTotal = document.getElementById('cardEntriesTotal');
-  els.transferEntriesTotal = document.getElementById('transferEntriesTotal');
-  els.discountEntriesTotal = document.getElementById('discountEntriesTotal');
-  els.cashEntriesList = document.getElementById('cashEntriesList');
-  els.cardEntriesList = document.getElementById('cardEntriesList');
-  els.transferEntriesList = document.getElementById('transferEntriesList');
-  els.discountEntriesList = document.getElementById('discountEntriesList');
+  els.unifiedPaymentBody = document.getElementById('unifiedPaymentBody');
+  els.unifiedPaymentFooter = document.getElementById('unifiedPaymentFooter');
+  els.totalGramsCol = document.getElementById('totalGramsCol');
+  els.totalDiscountCol = document.getElementById('totalDiscountCol');
+  els.totalCashCol = document.getElementById('totalCashCol');
+  els.totalTransferCol = document.getElementById('totalTransferCol');
+  els.totalCardCol = document.getElementById('totalCardCol');
 
   bindEvents();
   

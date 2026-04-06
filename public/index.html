@@ -113,43 +113,32 @@
         </div>
 
         <h2 class="h5 mt-4 mb-3">Order Payment Details</h2>
-        <div class="row g-3 payment-details-row">
-          <div class="col-md-3">
-            <div class="detail-box payment-detail-box">
-              <div class="detail-box-head">
-                <span>Cash Entries</span>
-                <strong id="cashEntriesTotal" class="payment-total">THB 0.00</strong>
-              </div>
-              <ul id="cashEntriesList" class="detail-list mb-0"></ul>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="detail-box payment-detail-box">
-              <div class="detail-box-head">
-                <span>Transfer Entries</span>
-                <strong id="transferEntriesTotal" class="payment-total">THB 0.00</strong>
-              </div>
-              <ul id="transferEntriesList" class="detail-list mb-0"></ul>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="detail-box payment-detail-box">
-              <div class="detail-box-head">
-                <span>Card Entries</span>
-                <strong id="cardEntriesTotal" class="payment-total">THB 0.00</strong>
-              </div>
-              <ul id="cardEntriesList" class="detail-list mb-0"></ul>
-            </div>
-          </div>
-          <div class="col-md-3">
-            <div class="detail-box payment-detail-box">
-              <div class="detail-box-head">
-                <span>Discount Entries</span>
-                <strong id="discountEntriesTotal" class="payment-total">THB 0.00</strong>
-              </div>
-              <ul id="discountEntriesList" class="detail-list mb-0"></ul>
-            </div>
-          </div>
+        <div class="order-entries-table-wrap mb-4">
+          <table class="table mb-0" id="unifiedPaymentTable">
+            <thead>
+              <tr>
+                <th class="text-center">G</th>
+                <th class="text-center">Dis</th>
+                <th class="text-end">Cash</th>
+                <th class="text-end">Transfer</th>
+                <th class="text-end">Card</th>
+              </tr>
+            </thead>
+            <tbody id="unifiedPaymentBody">
+              <tr>
+                <td colspan="5" class="text-center py-4 text-muted">No payment data synced yet</td>
+              </tr>
+            </tbody>
+            <tfoot id="unifiedPaymentFooter" class="d-none">
+              <tr class="table-light fw-bold">
+                <td id="totalGramsCol" class="text-center">0.000</td>
+                <td id="totalDiscountCol" class="text-center">-</td>
+                <td id="totalCashCol" class="text-end">0.00</td>
+                <td id="totalTransferCol" class="text-end">0.00</td>
+                <td id="totalCardCol" class="text-end">0.00</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
 
         <div class="d-flex flex-wrap align-items-center gap-3 mt-4">
@@ -260,7 +249,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   
-  <script src="app.js?v=ProExcelExport22"></script>
+  <script src="app.js?v=UnifiedPaymentTable01"></script>
   <script src="enhancements.js?v=17"></script>
 </body>
 </html>
