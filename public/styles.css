@@ -1223,3 +1223,57 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     height: 20px !important;
   }
 }
+
+
+/* Color-coded Price Styles for Payment Details Table */
+.price-main {
+  color: #2ecc8a;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+.price-separator {
+  color: #b0a090;
+  margin: 0 0.2em;
+  font-weight: 600;
+}
+
+.price-fb {
+  color: #f0ad4e;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+}
+
+/* Hover effect for better interactivity */
+#unifiedPaymentBody tr:hover .price-main {
+  color: #4edd9f;
+  text-shadow: 0 0 8px rgba(46, 204, 138, 0.4);
+}
+
+#unifiedPaymentBody tr:hover .price-fb {
+  color: #ffc966;
+  text-shadow: 0 0 8px rgba(240, 173, 78, 0.4);
+}
+
+/* Footer totals styling */
+#unifiedPaymentFooter .price-main {
+  color: #2ecc8a;
+  font-weight: 800;
+}
+
+#unifiedPaymentFooter .price-fb {
+  color: #f0ad4e;
+  font-weight: 800;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 576px) {
+  .price-main,
+  .price-fb {
+    font-size: 0.95rem;
+  }
+  
+  .price-separator {
+    font-size: 0.9rem;
+  }
+}

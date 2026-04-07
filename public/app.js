@@ -474,7 +474,8 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
     // If there is no F&B, always show / 0 for better visibility as requested
     const mainStr = formatCompactNumber(main);
     const fbStr = formatCompactNumber(fb);
-    return `${mainStr} / ${fbStr}`;
+    // Return HTML with color-coded spans: green for Flower/Main, orange for F&B
+    return `<span class="price-main">${mainStr}</span> <span class="price-separator">/</span> <span class="price-fb">${fbStr}</span>`;
   };
 
   if (sortedGroups.length === 0) {
@@ -504,9 +505,9 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
     if (els.unifiedPaymentFooter) {
       els.unifiedPaymentFooter.classList.remove('d-none');
       if (els.totalGramsCol) els.totalGramsCol.textContent = totalGrams.toFixed(3);
-      if (els.totalCashCol) els.totalCashCol.textContent = formatPriceSplit(totalCashMain, totalCashFb);
-      if (els.totalTransferCol) els.totalTransferCol.textContent = formatPriceSplit(totalTransferMain, totalTransferFb);
-      if (els.totalCardCol) els.totalCardCol.textContent = formatPriceSplit(totalCardMain, totalCardFb);
+      if (els.totalCashCol) els.totalCashCol.innerHTML = formatPriceSplit(totalCashMain, totalCashFb);
+      if (els.totalTransferCol) els.totalTransferCol.innerHTML = formatPriceSplit(totalTransferMain, totalTransferFb);
+      if (els.totalCardCol) els.totalCardCol.innerHTML = formatPriceSplit(totalCardMain, totalCardFb);
       
       const discountTotal = round2(parseNumber(data?.total_discount)) || discountEntries.reduce((s, e) => s + e.amount, 0);
       if (els.totalDiscountCol) els.totalDiscountCol.textContent = discountTotal > 0 ? formatCompactNumber(discountTotal) : '-';
