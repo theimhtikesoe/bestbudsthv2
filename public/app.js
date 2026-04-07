@@ -1137,11 +1137,7 @@ function bindEvents() {
   if (syncButton) {
     syncButton.addEventListener('click', syncFromLoyverse);
   }
-  const exportCsvBtn = document.getElementById('exportCsvBtn');
-  if (exportCsvBtn) {
-    exportCsvBtn.addEventListener('click', exportReportToExcel);
-  }
-  // Removed redundant addExpenseBtn listener because it's already in HTML onclick
+  // Export buttons already have inline onclick handlers in HTML, no need for duplicate listeners
 }
 
 // Expense logic moved to enhancements.js
