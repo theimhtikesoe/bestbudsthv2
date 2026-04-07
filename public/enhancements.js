@@ -239,7 +239,6 @@ function processItemsForExcel(receipts) {
     const items = receipt.line_items || receipt.items || [];
     const paymentMethod = (receipt.payments && receipt.payments[0]?.payment_type?.name) || 
                            (receipt.payments && receipt.payments[0]?.name) || "N/A";
-    const receiptNumber = receipt.receipt_number || receipt.number || "N/A";
 
     items.forEach(item => {
       if (!item || typeof item !== 'object') return;
