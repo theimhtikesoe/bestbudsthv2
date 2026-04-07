@@ -492,6 +492,8 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
   }
 
   if (els.unifiedPaymentBody) els.unifiedPaymentBody.innerHTML = html;
+
+  return { cashEntries, cardEntries, transferEntries };
 }
 
 /**
@@ -839,14 +841,14 @@ async function syncFromLoyverse() {
     }
 
     // Apply payment details after gram map is built from order entries
-    const paymentResults = applyPaymentDetails(data, receiptGramMap);
-    const { cashEntries, cardEntries, transferEntries } = paymentResults;
+    const paymentResults = applyPaymentDetails(data, receiptGramMap) || { cashEntries: [], cardEntries: [], transferEntries: [] };
+    const { cashEntries = [], cardEntries = [], transferEntries = [] } = paymentResults;
     
     // Update summary totals
     // We re-calculate totals from the filtered entries to ensure refunds are excluded
-    const totalCash = cashEntries.reduce((sum, e) => sum + e.amount, 0);
-    const totalCard = cardEntries.reduce((sum, e) => sum + e.amount, 0);
-    const totalTransfer = transferEntries.reduce((sum, e) => sum + e.amount, 0);
+    const totalCash = (cashEntries || []).reduce((sum, e) => sum + (e?.amount || 0), 0);
+    const totalCard = (cardEntries || []).reduce((sum, e) => sum + (e?.amount || 0), 0);
+    const totalTransfer = (transferEntries || []).reduce((sum, e) => sum + (e?.amount || 0), 0);
     const totalNetSale = totalCash + totalCard + totalTransfer;
     const totalOrdersCount = (Array.isArray(data?.orders) ? data.orders : []).filter(o => !isRefundOrder(o)).length;
     const totalFbFromPayments = [
