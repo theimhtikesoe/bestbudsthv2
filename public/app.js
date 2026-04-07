@@ -471,13 +471,10 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
 
   const formatPriceSplit = (main, fb) => {
     if (main <= 0 && fb <= 0) return '-';
-    // If there is no F&B, always show / 0 for better visibility as requested
     const mainStr = formatCompactNumber(main);
     const fbStr = formatCompactNumber(fb);
-    // Return HTML with color-coded spans: 
-    // .price-main (Flower/Main) is the first part (Green)
-    // .price-fb (F&B) is the second part (Orange/Amber)
-    return `<span class="price-main">${mainStr}</span> <span class="price-separator">/</span> <span class="price-fb">${fbStr}</span>`;
+    // Return plain text without color-coding for consistent, clean look
+    return `${mainStr} / ${fbStr}`;
   };
 
   if (sortedGroups.length === 0) {

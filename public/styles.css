@@ -305,24 +305,7 @@ body {
   border-top: 2px solid #3a3020;
 }
 
-/* Price Color Coding */
-.price-main {
-  color: #4edd9f; /* Bright Emerald Green */
-  font-weight: 900;
-  font-size: 1.05em;
-}
-
-.price-separator {
-  color: #888888;
-  margin: 0 0.3rem;
-  font-weight: 700;
-}
-
-.price-fb {
-  color: #ffa500; /* Bright Amber Orange */
-  font-weight: 900;
-  font-size: 1.05em;
-}
+/* Price Color Coding - Removed as requested for unified look */
 
 /* Detailed Sales Record Table Visibility Fix */
 #orderEntriesTable tbody td {
