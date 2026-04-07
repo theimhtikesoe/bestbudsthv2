@@ -1,10 +1,53 @@
 const dayjs = require('dayjs');
+const utc = require('dayjs/plugin/utc');
+const timezone = require('dayjs/plugin/timezone');
 const { query, getDialect } = require('../config/db');
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
 const { fetchSalesSummaryByDate } = require('../services/loyverseService');
 const { calculateReportValues, toNumber } = require('../utils/calculations');
 const { calculatePeriodBusinessSummary } = require('../services/settlementService');
 
 const isPostgres = getDialect() === 'postgres';
+
+// SSE Clients
+let clients = [];
+
+/**
+ * SSE middleware to handle real-time updates
+ */
+function eventsHandler(req, res) {
+  const headers = {
+    'Content-Type': 'text/event-stream',
+    'Connection': 'keep-alive',
+    'Cache-Control': 'no-cache',
+    'X-Accel-Buffering': 'no' // Disable buffering for Nginx/Proxy
+  };
+  res.writeHead(200, headers);
+
+  // Send a comment to keep connection alive
+  res.write('retry: 10000\n\n');
+  res.write(':ok\n\n');
+
+  const clientId = Date.now();
+  const newClient = {
+    id: clientId,
+    res
+  };
+  clients.push(newClient);
+
+  req.on('close', () => {
+    clients = clients.filter(client => client.id !== clientId);
+  });
+}
+
+/**
+ * Broadcast event to all connected clients
+ */
+function broadcast(data) {
+  clients.forEach(client => client.res.write(`data: ${JSON.stringify(data)}\n\n`));
+}
 const ONE_K_BILL_AMOUNT = 1000;
 
 function placeholder(index) {
@@ -24,7 +67,8 @@ function isValidDate(date) {
     return false;
   }
 
-  const parsed = dayjs(`${date}T00:00:00`);
+  const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
+  const parsed = dayjs.tz(`${date} 00:00:00`, tz);
   return parsed.isValid() && parsed.format('YYYY-MM-DD') === date;
 }
 
@@ -59,6 +103,60 @@ async function syncFromLoyverse(req, res, next) {
     validateDateOrThrow(date);
 
     const summary = await fetchSalesSummaryByDate(date);
+    
+    // Auto-save/upsert to database
+    const net_sale = toNumber(summary.net_sale);
+    const cash_total = toNumber(summary.cash_total);
+    const card_total = toNumber(summary.card_total);
+    const transfer_total = toNumber(summary.transfer_total);
+    const total_orders = toNumber(summary.total_orders);
+    const total_grams = toNumber(summary.total_grams);
+    const fb_total = toNumber(summary.fb_total);
+
+    const values = [
+      date, net_sale, cash_total, card_total, transfer_total,
+      total_orders, total_grams, fb_total, 0, 0, 0, 0, '1K Bill', 0, 0, 0, 0, 0
+    ];
+
+    if (isPostgres) {
+      await query(
+        `INSERT INTO daily_reports (
+          date, net_sale, cash_total, card_total, transfer_total,
+          total_orders, total_grams, fb_total, expense, tip,
+          ${oneKQtyColumn()}, ${oneKTotalColumn()}, safe_box_label,
+          safe_box_amount, opening_cash, actual_cash_counted, expected_cash, difference
+        ) VALUES (${placeholder(1)}, ${placeholder(2)}, ${placeholder(3)}, ${placeholder(4)}, ${placeholder(5)}, ${placeholder(6)}, ${placeholder(7)}, ${placeholder(8)}, ${placeholder(9)}, ${placeholder(10)}, ${placeholder(11)}, ${placeholder(12)}, ${placeholder(13)}, ${placeholder(14)}, ${placeholder(15)}, ${placeholder(16)}, ${placeholder(17)}, ${placeholder(18)})
+        ON CONFLICT (date) DO UPDATE SET
+          net_sale = EXCLUDED.net_sale,
+          cash_total = EXCLUDED.cash_total,
+          card_total = EXCLUDED.card_total,
+          transfer_total = EXCLUDED.transfer_total,
+          total_orders = EXCLUDED.total_orders,
+          total_grams = EXCLUDED.total_grams,
+          fb_total = EXCLUDED.fb_total`,
+        values
+      );
+    } else {
+      await query(
+        `INSERT INTO daily_reports (
+          date, net_sale, cash_total, card_total, transfer_total,
+          total_orders, total_grams, fb_total, expense, tip,
+          ${oneKQtyColumn()}, ${oneKTotalColumn()}, safe_box_label,
+          safe_box_amount, opening_cash, actual_cash_counted, expected_cash, difference
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ON DUPLICATE KEY UPDATE
+          net_sale = VALUES(net_sale),
+          cash_total = VALUES(cash_total),
+          card_total = VALUES(card_total),
+          transfer_total = VALUES(transfer_total),
+          total_orders = VALUES(total_orders),
+          total_grams = VALUES(total_grams),
+          fb_total = VALUES(fb_total)`,
+        values
+      );
+    }
+
+    broadcast({ type: 'REPORT', date, action: 'SYNC' });
     res.json(summary);
   } catch (error) {
     next(error);
@@ -71,12 +169,13 @@ async function getReportByDate(req, res, next) {
     validateDateOrThrow(date);
 
     const rows = await query(`SELECT * FROM daily_reports WHERE date = ${placeholder(1)}`, [date]);
+    const reportList = Array.isArray(rows) ? rows : [];
 
-    if (rows.length === 0) {
+    if (reportList.length === 0) {
       return res.status(404).json({ message: 'Report not found for this date' });
     }
 
-    return res.json(rows[0]);
+    return res.json(reportList[0]);
   } catch (error) {
     return next(error);
   }
@@ -99,13 +198,19 @@ async function upsertReport(req, res, next) {
     const safeBoxLabel = normalizeSafeBoxLabel(payload.safe_box_label);
     const oneKQty = toNonNegativeInteger(payload['1k_qty']);
     const oneKTotal = roundCurrency(oneKQty * ONE_K_BILL_AMOUNT);
+    const transferTotal = toNumber(payload.transfer_total);
+    const totalGrams = toNumber(payload.total_grams);
+    const fbTotal = toNumber(payload.fb_total);
 
     const values = [
       payload.date,
       reportValues.net_sale,
       reportValues.cash_total,
       reportValues.card_total,
+      transferTotal,
       totalOrders,
+      totalGrams,
+      fbTotal,
       reportValues.expense,
       tip,
       oneKQty,
@@ -125,7 +230,10 @@ async function upsertReport(req, res, next) {
           net_sale,
           cash_total,
           card_total,
+          transfer_total,
           total_orders,
+          total_grams,
+          fb_total,
           expense,
           tip,
           ${oneKQtyColumn()},
@@ -136,12 +244,15 @@ async function upsertReport(req, res, next) {
           actual_cash_counted,
           expected_cash,
           difference
-        ) VALUES (${placeholder(1)}, ${placeholder(2)}, ${placeholder(3)}, ${placeholder(4)}, ${placeholder(5)}, ${placeholder(6)}, ${placeholder(7)}, ${placeholder(8)}, ${placeholder(9)}, ${placeholder(10)}, ${placeholder(11)}, ${placeholder(12)}, ${placeholder(13)}, ${placeholder(14)}, ${placeholder(15)})
+        ) VALUES (${placeholder(1)}, ${placeholder(2)}, ${placeholder(3)}, ${placeholder(4)}, ${placeholder(5)}, ${placeholder(6)}, ${placeholder(7)}, ${placeholder(8)}, ${placeholder(9)}, ${placeholder(10)}, ${placeholder(11)}, ${placeholder(12)}, ${placeholder(13)}, ${placeholder(14)}, ${placeholder(15)}, ${placeholder(16)}, ${placeholder(17)}, ${placeholder(18)})
         ON CONFLICT (date) DO UPDATE SET
           net_sale = EXCLUDED.net_sale,
           cash_total = EXCLUDED.cash_total,
           card_total = EXCLUDED.card_total,
+          transfer_total = EXCLUDED.transfer_total,
           total_orders = EXCLUDED.total_orders,
+          total_grams = EXCLUDED.total_grams,
+          fb_total = EXCLUDED.fb_total,
           expense = EXCLUDED.expense,
           tip = EXCLUDED.tip,
           ${oneKQtyColumn()} = EXCLUDED.${oneKQtyColumn()},
@@ -157,6 +268,7 @@ async function upsertReport(req, res, next) {
         values
       );
 
+      broadcast({ type: 'REPORT_UPDATE', date: payload.date });
       return res.status(201).json(savedRows[0]);
     }
 
@@ -166,7 +278,10 @@ async function upsertReport(req, res, next) {
         net_sale,
         cash_total,
         card_total,
+        transfer_total,
         total_orders,
+        total_grams,
+        fb_total,
         expense,
         tip,
         ${oneKQtyColumn()},
@@ -177,12 +292,15 @@ async function upsertReport(req, res, next) {
         actual_cash_counted,
         expected_cash,
         difference
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON DUPLICATE KEY UPDATE
         net_sale = VALUES(net_sale),
         cash_total = VALUES(cash_total),
         card_total = VALUES(card_total),
+        transfer_total = VALUES(transfer_total),
         total_orders = VALUES(total_orders),
+        total_grams = VALUES(total_grams),
+        fb_total = VALUES(fb_total),
         expense = VALUES(expense),
         tip = VALUES(tip),
         ${oneKQtyColumn()} = VALUES(${oneKQtyColumn()}),
@@ -197,6 +315,7 @@ async function upsertReport(req, res, next) {
       values
     );
 
+    broadcast({ type: 'REPORT_UPDATE', date: payload.date });
     const savedRows = await query(`SELECT * FROM daily_reports WHERE date = ${placeholder(1)}`, [payload.date]);
     return res.status(201).json(savedRows[0]);
   } catch (error) {
@@ -239,7 +358,7 @@ async function listReports(req, res, next) {
     params.push(limit);
 
     const rows = await query(sql, params);
-    return res.json(rows);
+    return res.json(Array.isArray(rows) ? rows : []);
   } catch (error) {
     return next(error);
   }
@@ -253,8 +372,9 @@ async function getLast7DayNetSales(req, res, next) {
        ORDER BY date DESC
        LIMIT 7`
     );
+    const resultList = Array.isArray(rows) ? rows : [];
 
-    return res.json(rows.reverse());
+    return res.json(resultList.reverse());
   } catch (error) {
     return next(error);
   }
@@ -288,9 +408,10 @@ async function getReportsSummary(req, res, next) {
     sql += ' ORDER BY date ASC';
 
     const rows = await query(sql, params);
+    const resultList = Array.isArray(rows) ? rows : [];
 
     const summary = calculatePeriodBusinessSummary(
-      rows.map((row) => ({
+      resultList.map((row) => ({
         cashSales: toNumber(row.cash_total),
         cardSales: toNumber(row.card_total),
         transferSales: toNumber(row.transfer_total),
@@ -304,7 +425,7 @@ async function getReportsSummary(req, res, next) {
     return res.json({
       from: from || null,
       to: to || null,
-      days: rows.length,
+      days: resultList.length,
       ...summary
     });
   } catch (error) {
@@ -322,14 +443,15 @@ async function exportToExcel(req, res, next) {
 
     const { generateExcelReport } = require('../services/excelExportService');
     const { classifyItems } = require('../services/itemClassifier');
-    const { fetchClosedReceiptsByDate } = require('../services/loyverseService');
+    const { fetchClosedReceiptsByDate, filterOutRefundReceipts } = require('../services/loyverseService');
 
     // Get report data
     const reportRows = await query(
       `SELECT * FROM daily_reports WHERE date = ${placeholder(1)}`,
       [date]
     );
-    const reportData = reportRows[0];
+    const reportList = Array.isArray(reportRows) ? reportRows : [];
+    const reportData = reportList[0];
 
     if (!reportData) {
       const error = new Error('Report not found');
@@ -337,8 +459,9 @@ async function exportToExcel(req, res, next) {
       throw error;
     }
 
-    // Get receipts from Loyverse
-    const receipts = await fetchClosedReceiptsByDate(date);
+    // Get receipts from Loyverse and filter out refunds
+    const allReceipts = await fetchClosedReceiptsByDate(date);
+    const receipts = filterOutRefundReceipts(allReceipts);
     const classifiedReceipts = classifyItems(receipts);
 
     //     // Get expenses from query param (if provided by frontend LocalStorage)
@@ -357,7 +480,15 @@ async function exportToExcel(req, res, next) {
       );
     }
 
-    const buffer = await generateExcelReport(date, reportRows[0], receipts, expenses);
+    // Get closing staff
+    const staffRows = await query(
+      `SELECT name FROM daily_staff WHERE date = ${placeholder(1)} ORDER BY created_at DESC`,
+      [date]
+    );
+    const staffList = Array.isArray(staffRows) ? staffRows : [];
+    const closingStaff = staffList.length > 0 ? staffList.map(s => s.name).join(', ') : 'N/A';
+
+    const buffer = await generateExcelReport(date, reportData, receipts, expenses, closingStaff);
 
     // Send file
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -394,23 +525,19 @@ async function addExpense(req, res, next) {
       ? `INSERT INTO daily_expenses (date, category, description, amount, created_at) VALUES ($1, $2, $3, $4, NOW()) RETURNING *`
       : `INSERT INTO daily_expenses (date, category, description, amount, created_at) VALUES (?, ?, ?, ?, NOW())`;
 
-    // Ensure daily_report exists for this date due to foreign key constraint
-    const existingReport = await query(`SELECT date FROM daily_reports WHERE date = ${placeholder(1)}`, [date]);
-    if (existingReport.length === 0) {
-      // Create a skeleton report if it doesn't exist
-      const insertSql = isPostgres 
-        ? `INSERT INTO daily_reports (date) VALUES ($1) ON CONFLICT (date) DO NOTHING`
-        : `INSERT IGNORE INTO daily_reports (date) VALUES (?)`;
-      await query(insertSql, [date]);
-    }
-
+    console.log(`[EXPENSE] Saving expense for ${date}:`, { category, amount: expenseAmount });
     const result = await query(sql, [date, category, description || '', expenseAmount]);
+    console.log(`[EXPENSE] Result:`, result);
+
+    // Broadcast update
+    broadcast({ type: 'EXPENSE_UPDATE', date });
 
     res.status(201).json({
       success: true,
-      expense: result[0]
+      expense: isPostgres ? result[0] : { id: result.insertId, date, category, description, amount: expenseAmount }
     });
   } catch (error) {
+    console.error(`[EXPENSE] Failed to save expense:`, error.message, error.stack);
     return next(error);
   }
 }
@@ -426,7 +553,16 @@ async function removeExpense(req, res, next) {
       ? `DELETE FROM daily_expenses WHERE id = $1 RETURNING *`
       : `DELETE FROM daily_expenses WHERE id = ?`;
 
+    const rows = await query(`SELECT date FROM daily_expenses WHERE id = ${placeholder(1)}`, [id]);
+    const resultList = Array.isArray(rows) ? rows : [];
+    const date = resultList[0]?.date;
+
     await query(sql, [id]);
+
+    if (date) {
+      const formattedDate = dayjs(date).format('YYYY-MM-DD');
+      broadcast({ type: 'EXPENSE_UPDATE', date: formattedDate });
+    }
 
     res.json({ success: true, message: 'Expense deleted' });
   } catch (error) {
@@ -450,15 +586,112 @@ async function listExpenses(req, res, next) {
 
     res.json({
       date,
-      expenses,
-      total: expenses.reduce((sum, e) => sum + toNumber(e.amount), 0)
+      expenses: Array.isArray(expenses) ? expenses : [],
+      total: (Array.isArray(expenses) ? expenses : []).reduce((sum, e) => sum + toNumber(e.amount), 0)
     });
   } catch (error) {
     return next(error);
   }
 }
 
+/**
+ * Add staff
+ */
+async function addStaff(req, res, next) {
+  try {
+    const { date, name } = req.body;
+    validateDateOrThrow(date);
+
+    if (!name) {
+      const error = new Error('Name is required');
+      error.status = 400;
+      throw error;
+    }
+
+    const sql = isPostgres
+      ? `INSERT INTO daily_staff (date, name) VALUES ($1, $2) RETURNING *`
+      : `INSERT INTO daily_staff (date, name) VALUES (?, ?)`;
+    
+    console.log(`[STAFF] Saving staff for ${date}:`, { name });
+    const result = await query(sql, [date, name]);
+    console.log(`[STAFF] Result:`, result);
+
+    broadcast({ type: 'STAFF_UPDATE', date });
+
+    res.status(201).json({
+      success: true,
+      staff: isPostgres ? result[0] : { id: result.insertId, date, name }
+    });
+  } catch (error) {
+    console.error(`[STAFF] Failed to save staff:`, error.message, error.stack);
+    next(error);
+  }
+}
+
+/**
+ * Remove staff
+ */
+async function removeStaff(req, res, next) {
+  try {
+    const { id } = req.params;
+    const rows = await query(`SELECT date FROM daily_staff WHERE id = ${placeholder(1)}`, [id]);
+    const resultList = Array.isArray(rows) ? rows : [];
+    const date = resultList[0]?.date;
+
+    const sql = isPostgres
+      ? `DELETE FROM daily_staff WHERE id = $1`
+      : `DELETE FROM daily_staff WHERE id = ?`;
+    
+    await query(sql, [id]);
+
+    if (date) {
+      const formattedDate = dayjs(date).format('YYYY-MM-DD');
+      broadcast({ type: 'STAFF_UPDATE', date: formattedDate });
+    }
+
+    res.json({ success: true, message: 'Staff deleted' });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * List staff for a date
+ */
+async function listStaff(req, res, next) {
+  try {
+    const { date } = req.params;
+    validateDateOrThrow(date);
+
+    const sql = isPostgres
+      ? `SELECT * FROM daily_staff WHERE date = $1 ORDER BY created_at DESC`
+      : `SELECT * FROM daily_staff WHERE date = ? ORDER BY created_at DESC`;
+
+    const staff = await query(sql, [date]);
+
+    res.json({
+      date,
+      staff: Array.isArray(staff) ? staff : []
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+async function manualDbInit(req, res, next) {
+  try {
+    const { initializeSchema } = require('../config/db');
+    await initializeSchema();
+    res.json({ success: true, message: 'Database schema initialized successfully' });
+  } catch (error) {
+    console.error('[DB] Manual initialization failed:', error.message);
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
 module.exports = {
+  manualDbInit,
+  eventsHandler,
   syncFromLoyverse,
   getReportByDate,
   upsertReport,
@@ -468,5 +701,8 @@ module.exports = {
   exportToExcel,
   addExpense,
   removeExpense,
-  listExpenses
+  listExpenses,
+  addStaff,
+  removeStaff,
+  listStaff
 };

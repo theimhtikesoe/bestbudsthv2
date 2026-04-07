@@ -30,12 +30,12 @@ function getDateBounds(date) {
   }
   const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
 
-  // 🛡️ 1-MINUTE SHIFT FIX:
-  // Start exactly at 00:01:00.000 of the selected date
-  // End exactly at 00:00:59.999 of the following day
-  // This ensures midnight (00:00:00) belongs to the PREVIOUS day's report.
-  const startLocal = dayjs.tz(`${date} 00:01:00`, tz);
-  const endLocal = dayjs.tz(`${date} 00:01:00`, tz).add(1, 'day').subtract(1, 'millisecond');
+  // 🛡️ MIDNIGHT BOUNDARY FIX:
+  // Start exactly at 00:00:00.000 of the selected date (Inclusive)
+  // End exactly at 23:59:59.999 of the same date
+  // This ensures midnight (00:00:00) belongs to the NEW day's report, matching Loyverse.
+  const startLocal = dayjs.tz(`${date} 00:00:00`, tz);
+  const endLocal = startLocal.endOf('day');
 
   return {
     startIso: startLocal.utc().format('YYYY-MM-DDTHH:mm:ss.SSS[Z]'),
@@ -282,10 +282,31 @@ function isCompletedReceipt(receipt) {
     return false;
   }
 
+  // Reject if the receipt has a negative total (indicative of a refund)
+  const total = normalizeMoney(pickMoneyValue(
+    receipt?.total_money,
+    receipt?.total_price_money,
+    receipt?.amount_money,
+    receipt?.amount
+  ) ?? 0);
+  if (total < 0) {
+    return false;
+  }
+
   // Only accept valid closed/paid statuses
   const status = String(receipt.status || '').toUpperCase();
   const completedStatuses = new Set(['', 'CLOSED', 'COMPLETED', 'PAID']);
   return completedStatuses.has(status);
+}
+
+/**
+ * Filter receipts to exclude refund-related receipts
+ * @param {Array} receipts - Raw receipts from Loyverse
+ * @returns {Array} Filtered receipts excluding refunds
+ */
+function filterOutRefundReceipts(receipts) {
+  if (!Array.isArray(receipts)) return [];
+  return receipts.filter(isCompletedReceipt);
 }
 
 function normalizeCategoryValue(rawCategory) {
@@ -501,8 +522,11 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
     const itemTotal = extractLineItemPrice(lineItem);
     const itemGrossTotal = extractLineItemGrossPrice(lineItem);
     
-    // Skip Price 0 items
-    if (itemTotal <= 0.01) continue;
+    // Skip items where price is 0 OR discount is 100%
+    const itemDiscount = Math.max(0, itemGrossTotal - itemTotal);
+    const itemDiscountPercent = itemGrossTotal > 0 ? (itemDiscount / itemGrossTotal * 100) : 0;
+    
+    if (itemTotal <= 0.01 || itemDiscountPercent >= 99.99) continue;
 
     let qty = extractLineItemQty(lineItem);
 
@@ -575,56 +599,33 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
     );
 
     if (likelyWholeReceiptDiscount) {
-      const splitBase = roundCurrency(numeratorPrice + denominatorPrice);
-      if (splitBase > 0.01) {
-        const mainShare = numeratorPrice / splitBase;
-        let mainDeduct = roundCurrency(Math.min(numeratorPrice, remainingReceiptDiscount * mainShare));
-        let fbDeduct = roundCurrency(Math.min(denominatorPrice, remainingReceiptDiscount - mainDeduct));
-        let remainderAfterSplit = roundCurrency(remainingReceiptDiscount - mainDeduct - fbDeduct);
+        const splitBase = roundCurrency(numeratorPrice + denominatorPrice);
+        if (splitBase > 0.01) {
+          const mainShare = numeratorPrice / splitBase;
+          const fbShare = denominatorPrice / splitBase;
 
-        if (remainderAfterSplit > 0.01) {
-          const mainCapacity = roundCurrency(numeratorPrice - mainDeduct);
-          const fbCapacity = roundCurrency(denominatorPrice - fbDeduct);
+          const mainDeduct = roundCurrency(remainingReceiptDiscount * mainShare);
+          const fbDeduct = roundCurrency(remainingReceiptDiscount * fbShare);
 
-          if (mainCapacity >= fbCapacity && mainCapacity > 0.01) {
-            const extra = Math.min(remainderAfterSplit, mainCapacity);
-            mainDeduct = roundCurrency(mainDeduct + extra);
-            remainderAfterSplit = roundCurrency(remainderAfterSplit - extra);
-          }
-
-          if (remainderAfterSplit > 0.01 && fbCapacity > 0.01) {
-            const extra = Math.min(remainderAfterSplit, fbCapacity);
-            fbDeduct = roundCurrency(fbDeduct + extra);
-            remainderAfterSplit = roundCurrency(remainderAfterSplit - extra);
-          }
+          numeratorPrice = roundCurrency(numeratorPrice - mainDeduct);
+          denominatorPrice = roundCurrency(denominatorPrice - fbDeduct);
+          remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - mainDeduct - fbDeduct);
         }
-
-        numeratorPrice = roundCurrency(numeratorPrice - mainDeduct);
-        denominatorPrice = roundCurrency(denominatorPrice - fbDeduct);
-        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - mainDeduct - fbDeduct);
-      }
     } else {
-      const prioritizeMain = mainLineDiscount >= fbLineDiscount;
-      if (prioritizeMain && numeratorPrice > 0.01) {
-        const mainDeduct = Math.min(remainingReceiptDiscount, numeratorPrice);
+      // Re-evaluate the remaining discount distribution to be simpler and more direct
+      // Distribute remaining discount proportionally if both sides have sales
+      if (numeratorPrice > 0.01 && denominatorPrice > 0.01) {
+        const totalSales = numeratorPrice + denominatorPrice;
+        const mainDeduct = roundCurrency(remainingReceiptDiscount * (numeratorPrice / totalSales));
+        const fbDeduct = roundCurrency(remainingReceiptDiscount * (denominatorPrice / totalSales));
         numeratorPrice = roundCurrency(numeratorPrice - mainDeduct);
-        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - mainDeduct);
-      } else if (!prioritizeMain && denominatorPrice > 0.01) {
-        const fbDeduct = Math.min(remainingReceiptDiscount, denominatorPrice);
         denominatorPrice = roundCurrency(denominatorPrice - fbDeduct);
-        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - fbDeduct);
-      }
-
-      if (remainingReceiptDiscount > 0.01 && numeratorPrice > 0.01) {
-        const mainDeduct = Math.min(remainingReceiptDiscount, numeratorPrice);
-        numeratorPrice = roundCurrency(numeratorPrice - mainDeduct);
-        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - mainDeduct);
-      }
-
-      if (remainingReceiptDiscount > 0.01 && denominatorPrice > 0.01) {
-        const fbDeduct = Math.min(remainingReceiptDiscount, denominatorPrice);
-        denominatorPrice = roundCurrency(denominatorPrice - fbDeduct);
-        remainingReceiptDiscount = roundCurrency(remainingReceiptDiscount - fbDeduct);
+      } else if (numeratorPrice > 0.01) {
+        // If only main sales, apply all remaining discount to main
+        numeratorPrice = roundCurrency(numeratorPrice - remainingReceiptDiscount);
+      } else if (denominatorPrice > 0.01) {
+        // If only F&B sales, apply all remaining discount to F&B
+        denominatorPrice = roundCurrency(denominatorPrice - remainingReceiptDiscount);
       }
     }
 
@@ -1297,6 +1298,8 @@ async function fetchSalesSummaryByDate(date) {
     transfer_total: totals.total_transfer,
     net_sale: netSale,
     total_orders: totals.total_orders,
+    total_grams: automatedReport.totals.total_gram_qty,
+    fb_total: automatedReport.totals.total_denominator_price,
     unclassified_amount: roundCurrency(totals.unclassified_amount),
     cash_entries: totals.cash_entries,
     card_entries: totals.card_entries,
@@ -1316,5 +1319,8 @@ module.exports = {
   fetchPaymentTypeMap,
   extractPaymentEntries,
   classifyPaymentType,
-  isCompletedReceipt
+  isCompletedReceipt,
+  buildAutomatedReportRows,
+  fetchItemCategoryMap,
+  filterOutRefundReceipts
 };

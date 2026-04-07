@@ -29,9 +29,13 @@ const SYNC_TIMEOUT_MS = 25000;
 function renderExpenses() {
   const date = document.getElementById('reportDate')?.value;
   if (!date) return;
-  const expenses = typeof getLocalExpenses === 'function' ? getLocalExpenses(date) : [];
-  if (typeof renderExpensesList === 'function') {
-    renderExpensesList(expenses, date);
+  if (typeof fetchExpenses === 'function') {
+    fetchExpenses(date);
+  } else {
+    const expenses = typeof getLocalExpenses === 'function' ? getLocalExpenses(date) : [];
+    if (typeof renderExpensesList === 'function') {
+      renderExpensesList(expenses, date);
+    }
   }
 }
 // ----------------------
@@ -374,33 +378,152 @@ function attachDiscountPercentage(entries, discountEntries) {
 
 function applyPaymentDetails(data, receiptGramMap = new Map()) {
   const discountEntries = normalizeEntries(Array.isArray(data?.discount_entry_details) && data.discount_entry_details.length ? data.discount_entry_details : data?.discount_entries || []);
+  
+  // Create a set of refund receipt numbers for quick lookup
+  const refundReceiptNumbers = new Set(
+    (Array.isArray(data?.orders) ? data.orders : [])
+      .filter(isRefundOrder)
+      .map(o => String(o.receipt_number || o.number || '').trim())
+      .filter(Boolean)
+  );
+
+  const filterRefundEntries = (entries) => {
+    return entries.filter(e => {
+      const receiptKey = String(e.receiptNumber || '').trim();
+      return !refundReceiptNumbers.has(receiptKey);
+    });
+  };
+
   const cashEntries = attachDiscountPercentage(
-    attachGramShare(sortEntriesByTimeAsc(normalizeEntries(data?.cash_entries || [])), receiptGramMap),
+    attachGramShare(sortEntriesByTimeAsc(filterRefundEntries(normalizeEntries(data?.cash_entries || []))), receiptGramMap),
     discountEntries
   );
   const cardEntries = attachDiscountPercentage(
-    attachGramShare(sortEntriesByTimeAsc(normalizeEntries(data?.card_entries || [])), receiptGramMap),
+    attachGramShare(sortEntriesByTimeAsc(filterRefundEntries(normalizeEntries(data?.card_entries || []))), receiptGramMap),
     discountEntries
   );
   const transferEntries = attachDiscountPercentage(
-    attachGramShare(sortEntriesByTimeAsc(normalizeEntries(data?.transfer_entries || [])), receiptGramMap),
+    attachGramShare(sortEntriesByTimeAsc(filterRefundEntries(normalizeEntries(data?.transfer_entries || []))), receiptGramMap),
     discountEntries
   );
 
-  renderEntryList(els.cashEntriesList, cashEntries, { showGram: true, showDiscount: true });
-  renderEntryList(els.cardEntriesList, cardEntries, { showGram: true, showDiscount: true });
-  renderEntryList(els.transferEntriesList, transferEntries, { showGram: true, showDiscount: true });
-  renderEntryList(els.discountEntriesList, discountEntries, { showPercentage: true, percentageOnly: true });
+  // Group entries by receipt number or time to create a unified view
+  const groupedPayments = new Map();
 
-  const cashTotal = cashEntries.reduce((s, e) => s + e.amount, 0);
-  const cardTotal = cardEntries.reduce((s, e) => s + e.amount, 0);
-  const transferTotal = transferEntries.reduce((s, e) => s + e.amount, 0);
-  const discountTotal = round2(parseNumber(data?.total_discount)) || discountEntries.reduce((s, e) => s + e.amount, 0);
+  const addToGroup = (entry, type) => {
+    const key = entry.receiptNumber || `time-${entry.time}`;
+    if (!groupedPayments.has(key)) {
+      groupedPayments.set(key, {
+        grams: entry.gramShare || 0,
+        discount: entry.discountPercentage,
+        cash: { main: 0, fb: 0 },
+        transfer: { main: 0, fb: 0 },
+        card: { main: 0, fb: 0 },
+        time: entry.time
+      });
+    }
+    const group = groupedPayments.get(key);
+    group[type].main += entry.mainAccTotal || 0;
+    group[type].fb += entry.fbTotal || 0;
+    // Update grams if this entry has a higher gram share (prorated grams are same per receipt anyway)
+    if (entry.gramShare > group.grams) group.grams = entry.gramShare;
+    if (entry.discountPercentage && !group.discount) group.discount = entry.discountPercentage;
+  };
 
-  if (els.cashEntriesTotal) els.cashEntriesTotal.textContent = formatCurrency(cashTotal);
-  if (els.cardEntriesTotal) els.cardEntriesTotal.textContent = formatCurrency(cardTotal);
-  if (els.transferEntriesTotal) els.transferEntriesTotal.textContent = formatCurrency(transferTotal);
-  if (els.discountEntriesTotal) els.discountEntriesTotal.textContent = formatCurrency(discountTotal);
+  cashEntries.forEach(e => addToGroup(e, 'cash'));
+  transferEntries.forEach(e => addToGroup(e, 'transfer'));
+  cardEntries.forEach(e => addToGroup(e, 'card'));
+
+  const sortedGroups = Array.from(groupedPayments.values()).sort((a, b) => {
+    return new Date(a.time).getTime() - new Date(b.time).getTime();
+  });
+
+  let html = '';
+  let totalGrams = 0;
+  let totalCashMain = 0;
+  let totalCashFb = 0;
+  let totalTransferMain = 0;
+  let totalTransferFb = 0;
+  let totalCardMain = 0;
+  let totalCardFb = 0;
+
+  const formatPriceSplit = (main, fb) => {
+    if (main <= 0 && fb <= 0) return '-';
+    // If there is no F&B, always show / 0 for better visibility as requested
+    const mainStr = formatCompactNumber(main);
+    const fbStr = formatCompactNumber(fb);
+    return `${mainStr} / ${fbStr}`;
+  };
+
+  if (sortedGroups.length === 0) {
+    html = '<tr><td colspan="5" class="text-center py-4 text-muted">No payment data found</td></tr>';
+    if (els.unifiedPaymentFooter) els.unifiedPaymentFooter.classList.add('d-none');
+  } else {
+    sortedGroups.forEach(g => {
+      totalGrams += g.grams;
+      totalCashMain += g.cash.main;
+      totalCashFb += g.cash.fb;
+      totalTransferMain += g.transfer.main;
+      totalTransferFb += g.transfer.fb;
+      totalCardMain += g.card.main;
+      totalCardFb += g.card.fb;
+
+      html += `
+        <tr>
+          <td class="text-center">${g.grams > 0 ? formatGramCompact(g.grams) : '-'}</td>
+          <td class="text-center">${g.discount ? formatPercentage(g.discount) : '-'}</td>
+          <td class="text-end">${formatPriceSplit(g.cash.main, g.cash.fb)}</td>
+          <td class="text-end">${formatPriceSplit(g.transfer.main, g.transfer.fb)}</td>
+          <td class="text-end">${formatPriceSplit(g.card.main, g.card.fb)}</td>
+        </tr>
+      `;
+    });
+
+    if (els.unifiedPaymentFooter) {
+      els.unifiedPaymentFooter.classList.remove('d-none');
+      if (els.totalGramsCol) els.totalGramsCol.textContent = totalGrams.toFixed(3);
+      if (els.totalCashCol) els.totalCashCol.textContent = formatPriceSplit(totalCashMain, totalCashFb);
+      if (els.totalTransferCol) els.totalTransferCol.textContent = formatPriceSplit(totalTransferMain, totalTransferFb);
+      if (els.totalCardCol) els.totalCardCol.textContent = formatPriceSplit(totalCardMain, totalCardFb);
+      
+      const discountTotal = round2(parseNumber(data?.total_discount)) || discountEntries.reduce((s, e) => s + e.amount, 0);
+      if (els.totalDiscountCol) els.totalDiscountCol.textContent = discountTotal > 0 ? formatCompactNumber(discountTotal) : '-';
+    }
+  }
+
+  if (els.unifiedPaymentBody) els.unifiedPaymentBody.innerHTML = html;
+}
+
+/**
+ * Check if an order is a refund receipt
+ */
+function isRefundOrder(order) {
+  if (!order || typeof order !== 'object') return false;
+  
+  // Check receipt type
+  const receiptType = String(order.receipt_type || order.type || '').toUpperCase();
+  if (receiptType === 'REFUND') return true;
+  
+  // Check for refund flags
+  if (order.is_refunded === true || order.refunded === true || order.is_returned === true) return true;
+  if (order.refunded_at || order.returned_at) return true;
+  
+  // Check for refund collections
+  const hasRefunds = Array.isArray(order.refunds) && order.refunds.length > 0;
+  const hasRefundItems = Array.isArray(order.refund_items) && order.refund_items.length > 0;
+  const hasReturns = Array.isArray(order.returns) && order.returns.length > 0;
+  
+  if (hasRefunds || hasRefundItems || hasReturns) return true;
+
+  // Check for negative total
+  const total = Number(order.total_money?.amount ?? order.total_money ?? order.amount ?? 0);
+  if (total < 0) return true;
+
+  // Check for voided status
+  const status = String(order.status || '').toUpperCase();
+  if (['VOIDED', 'VOID', 'CANCELLED', 'CANCELED', 'DELETED'].includes(status)) return true;
+
+  return false;
 }
 
 /**
@@ -413,6 +536,8 @@ function processOrdersData(data) {
   let totalGrams = 0;
 
   orders.forEach(order => {
+    // Skip refund orders
+    if (isRefundOrder(order)) return;
     let orderLineGram = 0;
     let mainAndAccPrice = 0;
     let fbPriceTotal = 0;
@@ -458,7 +583,10 @@ function processOrdersData(data) {
         itemNetPrice = lineItemNetPrice - (lineItemNetPrice / (orderTotalMoney + orderDiscountMoney) * orderDiscountMoney);
       }
 
-      if (itemNetPrice <= 0.01) return;
+      const itemDiscount = Math.max(0, grossPrice - itemNetPrice);
+      const itemDiscountPercent = grossPrice > 0 ? (itemDiscount / grossPrice * 100) : 0;
+      
+      if (itemNetPrice <= 0.01 || itemDiscountPercent >= 99.99) return;
 
       let qty = qtyRaw;
       if (itemName.includes('lemon cherry') && grossPrice >= 4970) {
@@ -472,7 +600,7 @@ function processOrdersData(data) {
         'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
         'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
         'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-        'free pina colada', 'flower', 'bud', 'pre-roll', 'joint'
+        'free pina colada', 'thc gummy', 'flower', 'bud', 'pre-roll', 'joint'
       ];
 
       const fbKeywords = [
@@ -491,6 +619,7 @@ function processOrdersData(data) {
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
       let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
+      let isLobbyShirt = itemName.includes('the lobby shirt');
       
       let isFB = !isFlowerStrain && !isThcGummy && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
@@ -513,7 +642,8 @@ function processOrdersData(data) {
         fbPriceTotal += itemNetPrice;
       } else {
         mainAndAccPrice += itemNetPrice;
-        if (isFlowerStrain && !isThcGummy && !isAccessory) {
+        // Only count actual flower strains (not accessories or gummy)
+        if (isFlowerStrain && !isThcGummy && !isAccessory && !isLobbyShirt) {
           orderLineGram += qty;
         }
       }
@@ -521,7 +651,7 @@ function processOrdersData(data) {
       detailedItems.push({
         receipt: receiptNumber,
         time: receiptTime,
-        gram: (isFlowerStrain && !isThcGummy && !isAccessory) ? `${qty.toFixed(3)} G` : '',
+        gram: (isFlowerStrain && !isThcGummy && !isAccessory && !isLobbyShirt) ? `${qty.toFixed(3)} G` : '',
         itemName: item.name || item.item_name,
         price: itemNetPrice,
         isFB: isFB,
@@ -568,7 +698,7 @@ function processAutomatedReportRows(data) {
         'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
         'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
         'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-        'free pina colada', 'flower', 'bud', 'pre-roll', 'joint'
+        'free pina colada', 'thc gummy', 'flower', 'bud', 'pre-roll', 'joint'
       ];
 
       const fbKeywords = [
@@ -587,6 +717,7 @@ function processAutomatedReportRows(data) {
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
       let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
+      let isLobbyShirt = itemName.includes('the lobby shirt');
       
       let isFB = !isFlowerStrain && !isThcGummy && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
@@ -609,7 +740,8 @@ function processAutomatedReportRows(data) {
         fbPriceTotal += price;
       } else {
         mainAndAccPrice += price;
-        if (isFlowerStrain && !isThcGummy && !isAccessory) {
+        // Only count actual flower strains (not accessories or gummy)
+        if (isFlowerStrain && !isThcGummy && !isAccessory && !isLobbyShirt) {
           orderLineGram += qty;
         }
       }
@@ -617,7 +749,7 @@ function processAutomatedReportRows(data) {
       detailedItems.push({
         receipt: row.receipt_number,
         time: row.time,
-        gram: (isFlowerStrain && !isThcGummy && !isAccessory) ? `${qty.toFixed(3)} G` : '',
+        gram: (isFlowerStrain && !isThcGummy && !isAccessory && !isLobbyShirt) ? `${qty.toFixed(3)} G` : '',
         itemName: item.item_name,
         price: price,
         isFB: isFB,
@@ -710,25 +842,64 @@ async function syncFromLoyverse() {
     applyPaymentDetails(data, receiptGramMap);
     
     // Update summary totals
-    if (els.cashTotal) els.cashTotal.value = round2(data?.cash_total || 0).toFixed(2);
-    if (els.cardTotal) els.cardTotal.value = round2(data?.card_total || 0).toFixed(2);
-    if (els.transferTotal) els.transferTotal.value = round2(data?.transfer_total || 0).toFixed(2);
-    if (els.netSale) els.netSale.value = currentNetSale.toFixed(2);
-    if (els.totalOrders) els.totalOrders.value = data?.total_orders || 0;
+    // We re-calculate totals from the filtered entries to ensure refunds are excluded
+    const totalCash = cashEntries.reduce((sum, e) => sum + e.amount, 0);
+    const totalCard = cardEntries.reduce((sum, e) => sum + e.amount, 0);
+    const totalTransfer = transferEntries.reduce((sum, e) => sum + e.amount, 0);
+    const totalNetSale = totalCash + totalCard + totalTransfer;
+    const totalOrdersCount = (Array.isArray(data?.orders) ? data.orders : []).filter(o => !isRefundOrder(o)).length;
+    const totalFbFromPayments = [
+      ...cashEntries,
+      ...cardEntries,
+      ...transferEntries
+    ].reduce((sum, entry) => sum + parseNumber(entry?.fbTotal || entry?.fb_total), 0);
+
+    if (els.cashTotal) els.cashTotal.value = round2(totalCash).toFixed(2);
+    if (els.cardTotal) els.cardTotal.value = round2(totalCard).toFixed(2);
+    if (els.transferTotal) els.transferTotal.value = round2(totalTransfer).toFixed(2);
+    if (els.netSale) els.netSale.value = round2(totalNetSale).toFixed(2);
+    if (els.totalOrders) els.totalOrders.value = totalOrdersCount;
     if (els.orderEntriesFbTotal) {
-      const fbTotalFromPayments = [
-        ...(data?.cash_entries || []),
-        ...(data?.card_entries || []),
-        ...(data?.transfer_entries || [])
-      ].reduce((sum, entry) => sum + parseNumber(entry?.fb_total), 0);
-      els.orderEntriesFbTotal.textContent = formatCurrency(fbTotalFromPayments);
+      els.orderEntriesFbTotal.textContent = formatCurrency(totalFbFromPayments);
     }
+    
+    currentNetSale = totalNetSale;
     
     // Use the totalGrams calculated during processing
     if (els.totalGramsSold) els.totalGramsSold.innerText = totalGramsCalculated.toFixed(3) + ' G';
 
-    // Refresh Expense display
+    // Auto-save the report data to the database
+    const reportPayload = {
+      date: date,
+      net_sale: totalNetSale,
+      cash_total: totalCash,
+      card_total: totalCard,
+      transfer_total: totalTransfer,
+      total_orders: totalOrdersCount,
+      total_grams: totalGramsCalculated,
+      fb_total: totalFbFromPayments,
+      // Include current UI values for other fields if they exist
+      tip: document.getElementById('tip')?.value || 0,
+      '1k_qty': document.getElementById('1k_qty')?.value || 0,
+      opening_cash: document.getElementById('opening_cash')?.value || 0,
+      actual_cash_counted: document.getElementById('actual_cash_counted')?.value || 0
+    };
+
+    try {
+      await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(reportPayload)
+      });
+    } catch (saveError) {
+      console.error("Auto-save failed:", saveError);
+    }
+
+    // Refresh Expense and Staff display
     renderExpenses();
+    if (typeof fetchStaff === 'function' && date) {
+      fetchStaff(date);
+    }
     
   } catch (e) { 
     if (requestId !== activeSyncRequestId) {
@@ -760,6 +931,51 @@ function setButtonLoading(button, text, isLoading) {
     button.innerHTML = button.dataset.originalText || 'Sync From Loyverse';
   }
 }
+
+window.loadReportData = async function(date) {
+  if (!date) return;
+  
+  // Clear lists to prevent "frozen" UI while loading
+  const staffContainer = document.getElementById('closingStaffList');
+  if (staffContainer) staffContainer.innerHTML = '<p class="text-muted">Loading...</p>';
+  const expenseContainer = document.getElementById('expensesList');
+  if (expenseContainer) expenseContainer.innerHTML = '<p class="text-muted">Loading...</p>';
+
+  try {
+    const res = await fetch(`/api/reports/${date}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data) {
+        if (els.cashTotal) els.cashTotal.value = round2(data.cash_total || 0).toFixed(2);
+        if (els.cardTotal) els.cardTotal.value = round2(data.card_total || 0).toFixed(2);
+        if (els.transferTotal) els.transferTotal.value = round2(data.transfer_total || 0).toFixed(2);
+        if (els.netSale) els.netSale.value = round2(data.net_sale || 0).toFixed(2);
+        if (els.totalOrders) els.totalOrders.value = data.total_orders || 0;
+        if (els.totalGramsSold) els.totalGramsSold.innerText = (data.total_grams || 0).toFixed(3) + ' G';
+        if (els.orderEntriesFbTotal) els.orderEntriesFbTotal.textContent = formatCurrency(data.fb_total || 0);
+        
+        // Load staff and expenses explicitly
+        if (typeof fetchStaff === 'function') fetchStaff(date);
+        if (typeof fetchExpenses === 'function') fetchExpenses(date);
+      }
+    } else {
+      // Reset UI if no report found
+      if (els.cashTotal) els.cashTotal.value = '0.00';
+      if (els.cardTotal) els.cardTotal.value = '0.00';
+      if (els.transferTotal) els.transferTotal.value = '0.00';
+      if (els.netSale) els.netSale.value = '0.00';
+      if (els.totalOrders) els.totalOrders.value = '0';
+      if (els.totalGramsSold) els.totalGramsSold.innerText = '0.000 G';
+      if (els.orderEntriesFbTotal) els.orderEntriesFbTotal.textContent = 'THB 0.00';
+      
+      // Clear staff/expenses lists if no report
+      if (staffContainer) staffContainer.innerHTML = '<p class="text-muted">No staff added</p>';
+      if (expenseContainer) expenseContainer.innerHTML = '<p class="text-muted">No expenses added</p>';
+    }
+  } catch (err) {
+    console.error("Load error:", err);
+  }
+};
 
 function sortOrderEntriesByTimeAsc(entries) {
   return [...entries].sort((a, b) => {
@@ -841,13 +1057,19 @@ function bindEvents() {
   const reportDateInput = document.getElementById('reportDate');
   if (reportDateInput) {
     reportDateInput.addEventListener('change', () => {
+      const date = reportDateInput.value;
+      if (!date) return;
+
       const monthInput = document.getElementById('reportMonth');
-      if (monthInput && reportDateInput.value) {
-        monthInput.value = reportDateInput.value.slice(0, 7);
+      if (monthInput) {
+        monthInput.value = date.slice(0, 7);
       }
-      if (typeof window.loadReportData === 'function' && reportDateInput.value) {
-        window.loadReportData(reportDateInput.value);
+      
+      // loadReportData now handles staff/expenses loading internally
+      if (typeof window.loadReportData === 'function') {
+        window.loadReportData(date);
       }
+      
       syncFromLoyverse();
     });
   }
@@ -859,10 +1081,7 @@ function bindEvents() {
   if (exportCsvBtn) {
     exportCsvBtn.addEventListener('click', exportReportToExcel);
   }
-  const addExpenseBtn = document.querySelector('#expenseSection button.btn-success');
-  if (addExpenseBtn) {
-    addExpenseBtn.addEventListener('click', addExpenseToReport);
-  }
+  // Removed redundant addExpenseBtn listener because it's already in HTML onclick
 }
 
 // Expense logic moved to enhancements.js
@@ -883,14 +1102,13 @@ const els = {
   totalOrders: document.getElementById('totalOrders'),
   totalGramsSold: document.getElementById('totalGramsSold'),
   orderEntriesFbTotal: document.getElementById('orderEntriesFbTotal'),
-  cashEntriesTotal: document.getElementById('cashEntriesTotal'),
-  cardEntriesTotal: document.getElementById('cardEntriesTotal'),
-  transferEntriesTotal: document.getElementById('transferEntriesTotal'),
-  discountEntriesTotal: document.getElementById('discountEntriesTotal'),
-  cashEntriesList: document.getElementById('cashEntriesList'),
-  cardEntriesList: document.getElementById('cardEntriesList'),
-  transferEntriesList: document.getElementById('transferEntriesList'),
-  discountEntriesList: document.getElementById('discountEntriesList')
+  unifiedPaymentBody: document.getElementById('unifiedPaymentBody'),
+  unifiedPaymentFooter: document.getElementById('unifiedPaymentFooter'),
+  totalGramsCol: document.getElementById('totalGramsCol'),
+  totalDiscountCol: document.getElementById('totalDiscountCol'),
+  totalCashCol: document.getElementById('totalCashCol'),
+  totalTransferCol: document.getElementById('totalTransferCol'),
+  totalCardCol: document.getElementById('totalCardCol')
 };
 
 function init() {
@@ -911,19 +1129,23 @@ function init() {
   els.totalOrders = document.getElementById('totalOrders');
   els.totalGramsSold = document.getElementById('totalGramsSold');
   els.orderEntriesFbTotal = document.getElementById('orderEntriesFbTotal');
-  els.cashEntriesTotal = document.getElementById('cashEntriesTotal');
-  els.cardEntriesTotal = document.getElementById('cardEntriesTotal');
-  els.transferEntriesTotal = document.getElementById('transferEntriesTotal');
-  els.discountEntriesTotal = document.getElementById('discountEntriesTotal');
-  els.cashEntriesList = document.getElementById('cashEntriesList');
-  els.cardEntriesList = document.getElementById('cardEntriesList');
-  els.transferEntriesList = document.getElementById('transferEntriesList');
-  els.discountEntriesList = document.getElementById('discountEntriesList');
+  els.unifiedPaymentBody = document.getElementById('unifiedPaymentBody');
+  els.unifiedPaymentFooter = document.getElementById('unifiedPaymentFooter');
+  els.totalGramsCol = document.getElementById('totalGramsCol');
+  els.totalDiscountCol = document.getElementById('totalDiscountCol');
+  els.totalCashCol = document.getElementById('totalCashCol');
+  els.totalTransferCol = document.getElementById('totalTransferCol');
+  els.totalCardCol = document.getElementById('totalCardCol');
 
   bindEvents();
-  if (typeof window.loadReportData === 'function' && reportDateInput?.value) {
-    window.loadReportData(reportDateInput.value);
+  
+  const date = reportDateInput?.value;
+  if (date) {
+    if (typeof window.loadReportData === 'function') {
+      window.loadReportData(date);
+    }
   }
+  
   syncFromLoyverse();
   const mainContent = document.querySelector('.app-main-content');
   if (mainContent) {
