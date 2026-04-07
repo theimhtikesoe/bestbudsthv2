@@ -306,7 +306,52 @@ function isCompletedReceipt(receipt) {
  */
 function filterOutRefundReceipts(receipts) {
   if (!Array.isArray(receipts)) return [];
-  return receipts.filter(isCompletedReceipt);
+  
+  // 1. Identify all refund receipts and the original receipts they point to
+  const refundReceiptNumbers = new Set();
+  const originalReceiptNumbersToExclude = new Set();
+  
+  receipts.forEach(receipt => {
+    const type = String(receipt.receipt_type || receipt.type || '').toUpperCase();
+    const receiptNumber = String(receipt.receipt_number || receipt.number || '').trim();
+    
+    if (type === 'REFUND') {
+      refundReceiptNumbers.add(receiptNumber);
+      
+      // Look for the original receipt number in the refund data
+      // Loyverse often puts the original receipt number in refund_for or similar fields
+      const originalNumber = receipt.refund_for || receipt.refund_for_receipt_number || receipt.original_receipt_number;
+      if (originalNumber) {
+        originalReceiptNumbersToExclude.add(String(originalNumber).trim());
+      }
+      
+      // Also check if it's in the note or description (common in some setups)
+      const note = String(receipt.note || '').toUpperCase();
+      const match = note.match(/REFUND\s+(?:OF\s+)?#?([0-9-]+)/);
+      if (match && match[1]) {
+        originalReceiptNumbersToExclude.add(match[1].trim());
+      }
+    }
+    
+    // Check if the receipt itself is marked as refunded
+    if (hasRefundData(receipt)) {
+      originalReceiptNumbersToExclude.add(receiptNumber);
+    }
+  });
+  
+  // 2. Filter out both the refund receipts and the original receipts that were refunded
+  return receipts.filter(receipt => {
+    const receiptNumber = String(receipt.receipt_number || receipt.number || '').trim();
+    
+    // Exclude if it's a refund receipt
+    if (refundReceiptNumbers.has(receiptNumber)) return false;
+    
+    // Exclude if it's an original receipt that was later refunded
+    if (originalReceiptNumbersToExclude.has(receiptNumber)) return false;
+    
+    // Standard completion check
+    return isCompletedReceipt(receipt);
+  });
 }
 
 function normalizeCategoryValue(rawCategory) {

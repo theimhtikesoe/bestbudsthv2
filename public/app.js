@@ -380,17 +380,39 @@ function applyPaymentDetails(data, receiptGramMap = new Map()) {
   const discountEntries = normalizeEntries(Array.isArray(data?.discount_entry_details) && data.discount_entry_details.length ? data.discount_entry_details : data?.discount_entries || []);
   
   // Create a set of refund receipt numbers for quick lookup
-  const refundReceiptNumbers = new Set(
-    (Array.isArray(data?.orders) ? data.orders : [])
-      .filter(isRefundOrder)
-      .map(o => String(o.receipt_number || o.number || '').trim())
-      .filter(Boolean)
-  );
+  const orders = Array.isArray(data?.orders) ? data.orders : [];
+  const refundReceiptNumbers = new Set();
+  const originalReceiptNumbersToExclude = new Set();
+  
+  orders.forEach(order => {
+    const receiptNumber = String(order.receipt_number || order.number || '').trim();
+    if (isRefundOrder(order)) {
+      refundReceiptNumbers.add(receiptNumber);
+      
+      // Look for the original receipt number in the refund data
+      const originalNumber = order.refund_for || order.refund_for_receipt_number || order.original_receipt_number;
+      if (originalNumber) {
+        originalReceiptNumbersToExclude.add(String(originalNumber).trim());
+      }
+      
+      // Also check if it's in the note or description (common in some setups)
+      const note = String(order.note || '').toUpperCase();
+      const match = note.match(/REFUND\s+(?:OF\s+)?#?([0-9-]+)/);
+      if (match && match[1]) {
+        originalReceiptNumbersToExclude.add(match[1].trim());
+      }
+    }
+    
+    // Check if the receipt itself is marked as refunded
+    if (order.is_refunded === true || order.refunded === true || order.is_returned === true || order.refunded_at || order.returned_at) {
+      originalReceiptNumbersToExclude.add(receiptNumber);
+    }
+  });
 
   const filterRefundEntries = (entries) => {
     return entries.filter(e => {
       const receiptKey = String(e.receiptNumber || '').trim();
-      return !refundReceiptNumbers.has(receiptKey);
+      return !refundReceiptNumbers.has(receiptKey) && !originalReceiptNumbersToExclude.has(receiptKey);
     });
   };
 
@@ -533,17 +555,49 @@ function isRefundOrder(order) {
  */
 function processOrdersData(data) {
   const orders = Array.isArray(data?.orders) ? data.orders : [];
+  
+  // 1. Identify all refund receipts and the original receipts they point to
+  const refundReceiptNumbers = new Set();
+  const originalReceiptNumbersToExclude = new Set();
+  
+  orders.forEach(order => {
+    const receiptNumber = String(order.receipt_number || order.number || '').trim();
+    if (isRefundOrder(order)) {
+      refundReceiptNumbers.add(receiptNumber);
+      
+      // Look for the original receipt number in the refund data
+      const originalNumber = order.refund_for || order.refund_for_receipt_number || order.original_receipt_number;
+      if (originalNumber) {
+        originalReceiptNumbersToExclude.add(String(originalNumber).trim());
+      }
+      
+      // Also check if it's in the note or description (common in some setups)
+      const note = String(order.note || '').toUpperCase();
+      const match = note.match(/REFUND\s+(?:OF\s+)?#?([0-9-]+)/);
+      if (match && match[1]) {
+        originalReceiptNumbersToExclude.add(match[1].trim());
+      }
+    }
+    
+    // Check if the receipt itself is marked as refunded
+    if (order.is_refunded === true || order.refunded === true || order.is_returned === true || order.refunded_at || order.returned_at) {
+      originalReceiptNumbersToExclude.add(receiptNumber);
+    }
+  });
+
   const orderEntries = [];
   const detailedItems = [];
   let totalGrams = 0;
 
   orders.forEach(order => {
-    // Skip refund orders
+    const receiptNumber = String(order.receipt_number || order.number || '').trim();
+    
+    // Skip refund orders and original orders that were refunded
+    if (refundReceiptNumbers.has(receiptNumber) || originalReceiptNumbersToExclude.has(receiptNumber)) return;
     if (isRefundOrder(order)) return;
     let orderLineGram = 0;
     let mainAndAccPrice = 0;
     let fbPriceTotal = 0;
-    const receiptNumber = order.receipt_number || order.number;
     const receiptTime = order.created_at;
 
     const items = order?.line_items || order?.items || [];
