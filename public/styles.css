@@ -294,16 +294,17 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.table tfoot {
-  background: #000000; /* Black background for footer */
+.table tfoot,
+.table tfoot tr,
+.table tfoot td {
+  background: #000000 !important; /* Black background for footer */
+  color: #ffffff !important; /* Pure white text on black */
   font-weight: 800;
 }
 
 .table tfoot td {
   padding: 1.25rem 1rem;
-  color: #ffffff !important; /* Pure white text on black */
   border-top: 2px solid #ffffff; /* White border for contrast */
-  background: #000000 !important; /* Ensure black background */
 }
 
 /* Price Color Coding - Removed as requested for unified look */
