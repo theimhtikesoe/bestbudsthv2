@@ -162,7 +162,6 @@ async function fetchClosedReceiptsByDate(date) {
     const params = {
       created_at_min: startIso,
       created_at_max: endIso,
-      status: 'CLOSED',
       limit: 250
     };
 
