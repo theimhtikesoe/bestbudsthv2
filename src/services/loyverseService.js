@@ -1240,7 +1240,12 @@ async function fetchSalesSummaryByDate(date) {
     discount_entry_details: []
   };
 
-  const closedReceipts = receipts.filter(isCompletedReceipt);
+  // Use the comprehensive filterOutRefundReceipts which excludes:
+  // 1. Receipts with type === 'REFUND'
+  // 2. Original receipts that were later refunded
+  // 3. Voided/cancelled receipts
+  // 4. Receipts with negative totals
+  const closedReceipts = filterOutRefundReceipts(receipts);
 
   // Enrich each receipt's line_items with category_name from itemCategoryMap
   // so the frontend can classify items correctly

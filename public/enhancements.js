@@ -203,11 +203,38 @@ function processItemsForExcel(receipts) {
   let totalFlowerGrams = 0;
 
   let totalFbAmount = 0;
+
+  // Build sets of receipt numbers to exclude:
+  // 1. Refund receipts themselves
+  // 2. Original receipts that were later refunded
+  const refundReceiptNumbers = new Set();
+  const originalReceiptNumbersToExclude = new Set();
+
+  receipts.forEach(receipt => {
+    if (!receipt || typeof receipt !== 'object') return;
+    const receiptNumber = String(receipt.receipt_number || receipt.number || '').trim();
+    if (isRefundReceipt(receipt)) {
+      refundReceiptNumbers.add(receiptNumber);
+      // Track the original receipt this refund points to
+      const originalNumber = receipt.refund_for || receipt.refund_for_receipt_number || receipt.original_receipt_number;
+      if (originalNumber) {
+        originalReceiptNumbersToExclude.add(String(originalNumber).trim());
+      }
+    }
+    // Also exclude receipts that are marked as refunded
+    if (receipt.is_refunded === true || receipt.refunded === true || receipt.is_returned === true || receipt.refunded_at || receipt.returned_at) {
+      originalReceiptNumbersToExclude.add(receiptNumber);
+    }
+  });
+
   receipts.forEach(receipt => {
     if (!receipt || typeof receipt !== 'object') return;
     
-    // Skip refund receipts
+    // Skip refund receipts and original receipts that were refunded
+    const receiptNumber = String(receipt.receipt_number || receipt.number || '').trim();
     if (isRefundReceipt(receipt)) return;
+    if (refundReceiptNumbers.has(receiptNumber)) return;
+    if (originalReceiptNumbersToExclude.has(receiptNumber)) return;
 
     const items = receipt.line_items || receipt.items || [];
     const paymentMethod = (receipt.payments && receipt.payments[0]?.payment_type?.name) || 
@@ -403,15 +430,21 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
   currRow += 2;
 
   // Dashboard Section
+  // IMPORTANT: Use locally calculated totals from processItemsForExcel (refund-excluded)
+  // rather than rawData values which may still include refund amounts.
   paintSection("Dashboard (Daily Summary)");
-  const fbTotal = Number(rawData.fb_total || calculatedFbTotal || 0);
+  // Use calculatedFbTotal from the F&B section above (already refund-excluded)
+  const fbTotal = calculatedFbTotal > 0 ? calculatedFbTotal : Number(rawData.fb_total || 0);
   const cashTotal = Number(rawData.cash_total || 0);
   const cardTotal = Number(rawData.card_total || 0);
   const transferTotal = Number(rawData.transfer_total || 0);
-  const netSale = Number(rawData.net_sale || 0);
+  // Net sale = cash + card + transfer (already refund-excluded from backend sync)
+  const netSale = cashTotal + cardTotal + transferTotal > 0
+    ? cashTotal + cardTotal + transferTotal
+    : Number(rawData.net_sale || 0);
   
   const summaryData = [
-    ["Flower Sales (grams)", Number(totalFlowerGrams || rawData.total_grams || 0)],
+    ["Flower Sales (grams)", totalFlowerGrams > 0 ? totalFlowerGrams : Number(rawData.total_grams || 0)],
     ["Cash In", cashTotal],
     ["Card In", cardTotal],
     ["Transfer In", transferTotal],
@@ -597,18 +630,18 @@ function paintDailySheet(sheet, date, staffName, rawData, expenses, flowerItems,
       const { flowerItems, fbItems, totalFlowerGrams: dailyFlowerGrams, totalFbAmount: dailyFbTotal } = processItemsForExcel(detailedData?.orders || detailedData?.receipts || []);
       paintDailySheet(daySheet, dateStr, staff, detailedData || report || { date: dateStr }, expenses, flowerItems, fbItems, dailyFlowerGrams);
       
-      // Update summary values with live calculated data if available
+      // Always update summary with live calculated data from processItemsForExcel
+      // (which excludes refunds) when detailedData is available
       if (detailedData) {
-        if (dailyFlowerGrams > 0) {
-          const diff = dailyFlowerGrams - grams;
-          totalGrams += diff;
-          summarySheet.getCell(sRow - 1, 2).value = dailyFlowerGrams;
-        }
-        if (dailyFbTotal > 0) {
-          const diff = dailyFbTotal - fb;
-          totalFb += diff;
-          summarySheet.getCell(sRow - 1, 6).value = dailyFbTotal;
-        }
+        // Always replace grams with live calculated value (refund-excluded)
+        const diff = dailyFlowerGrams - grams;
+        totalGrams += diff;
+        summarySheet.getCell(sRow - 1, 2).value = dailyFlowerGrams;
+        
+        // Always replace fb total with live calculated value (refund-excluded)
+        const fbDiff = dailyFbTotal - fb;
+        totalFb += fbDiff;
+        summarySheet.getCell(sRow - 1, 6).value = dailyFbTotal;
       }
 
       // Small delay to keep UI responsive
