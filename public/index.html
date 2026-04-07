@@ -65,7 +65,7 @@
 
     <section id="reportSection" class="card shadow-sm mb-4">
       <div class="card-body">
-        <div class="row g-3 align-items-end mb-3 action-btn-row">
+        <div class="row g-3 align-items-end mb-4 action-btn-row">
           <div class="col-lg-4 col-md-6">
             <label for="reportDate" class="form-label">Report Date</label>
             <input id="reportDate" type="date" class="form-control" />
@@ -79,35 +79,40 @@
           </div>
         </div>
 
-        <div class="row g-3 mb-3 summary-metrics-row">
-          <div class="col-md-2">
-            <label for="netSale" class="form-label">Net Sale</label>
-            <input id="netSale" type="number" min="0" step="0.01" class="form-control" readonly />
+        <div class="summary-metrics-row mb-4">
+          <div class="metric-box">
+            <div class="metric-label">Net Sale</div>
+            <input id="netSale" type="number" min="0" step="0.01" class="form-control text-center" readonly />
           </div>
-          <div class="col-md-2">
-            <label for="cashTotal" class="form-label">Cash Total</label>
-            <input id="cashTotal" type="number" min="0" step="0.01" class="form-control" readonly />
+          <div class="metric-box">
+            <div class="metric-label">Cash Total</div>
+            <input id="cashTotal" type="number" min="0" step="0.01" class="form-control text-center" readonly />
           </div>
-          <div class="col-md-2">
-            <label for="cardTotal" class="form-label">Card Total</label>
-            <input id="cardTotal" type="number" min="0" step="0.01" class="form-control" readonly />
+          <div class="metric-box">
+            <div class="metric-label">Card Total</div>
+            <input id="cardTotal" type="number" min="0" step="0.01" class="form-control text-center" readonly />
           </div>
-          <div class="col-md-2">
-            <label for="transferTotal" class="form-label">Transfer Total</label>
-            <input id="transferTotal" type="number" min="0" step="0.01" class="form-control" readonly />
+          <div class="metric-box">
+            <div class="metric-label">Transfer Total</div>
+            <input id="transferTotal" type="number" min="0" step="0.01" class="form-control text-center" readonly />
           </div>
-          <div class="col-md-2">
-            <label for="totalOrders" class="form-label">Total Orders</label>
-            <input id="totalOrders" type="number" min="0" step="1" class="form-control" readonly />
+          <div class="metric-box">
+            <div class="metric-label">Total Orders</div>
+            <input id="totalOrders" type="number" min="0" step="1" class="form-control text-center" readonly />
           </div>
-          <div class="col-md-2 summary-stack-col">
+        </div>
+
+        <div class="row g-3 mb-4">
+          <div class="col-md-6">
             <div class="gram-stat-card">
-              <span class="gram-stat-label">Total Grams Sold</span>
-              <strong id="totalGramsSold" class="gram-stat-value">0.000 G</strong>
+              <div class="gram-stat-label">Total Grams Sold 🌿</div>
+              <div id="totalGramsSold" class="gram-stat-value">0.000 G</div>
             </div>
-            <div class="gram-stat-card mt-2">
-              <span class="gram-stat-label">F&amp;B Total</span>
-              <strong id="orderEntriesFbTotal" class="gram-stat-value">THB 0.00</strong>
+          </div>
+          <div class="col-md-6">
+            <div class="gram-stat-card">
+              <div class="gram-stat-label">F&amp;B Total 🍔</div>
+              <div id="orderEntriesFbTotal" class="gram-stat-value">THB 0.00</div>
             </div>
           </div>
         </div>
