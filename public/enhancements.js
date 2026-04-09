@@ -847,10 +847,14 @@ function extractHourlySalesData(orders) {
   const hourlyData = {};
   
   orders.forEach(order => {
-    if (!order.time) return;
+    // Check for both order.time (from processed entries) and order.created_at (from raw Loyverse orders)
+    const timeStr = order.time || order.created_at;
+    if (!timeStr) return;
     
     try {
-      const date = new Date(order.time);
+      const date = new Date(timeStr);
+      if (isNaN(date.getTime())) return;
+      
       const hour = date.getHours();
       const hourKey = `${hour.toString().padStart(2, '0')}:00`;
       
@@ -858,10 +862,14 @@ function extractHourlySalesData(orders) {
         hourlyData[hourKey] = 0;
       }
       
-      // Add the order amount (mainAndAccPrice + fbPrice)
+      // Add the order amount
+      // Processed orders use mainAndAccPrice/fbPrice
+      // Raw orders use total_money.amount
       const mainPrice = parseNumber(order.mainAndAccPrice || 0);
       const fbPrice = parseNumber(order.fbPrice || 0);
-      hourlyData[hourKey] += mainPrice + fbPrice;
+      const rawAmount = parseNumber(order.total_money?.amount || 0);
+      
+      hourlyData[hourKey] += (mainPrice + fbPrice) || rawAmount;
     } catch (e) {
       console.error('Error processing order time:', e);
     }
@@ -901,8 +909,8 @@ function renderDailySalesTrendChart(orders) {
         label: 'Sales (THB)',
         data: salesData,
         borderColor: '#0066cc',
-        backgroundColor: 'rgba(0, 102, 204, 0.1)',
-        borderWidth: 2,
+        backgroundColor: 'rgba(0, 102, 204, 0.2)',
+        borderWidth: 3,
         fill: true,
         tension: 0.4,
         pointRadius: 4,
@@ -920,21 +928,23 @@ function renderDailySalesTrendChart(orders) {
           display: true,
           labels: {
             color: '#ffffff',
-            font: { weight: 'bold', size: 12 },
-            padding: 15
+            font: { weight: 'bold', size: 14 },
+            padding: 20
           }
         },
         tooltip: {
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
           titleColor: '#ffffff',
           bodyColor: '#ffffff',
+          titleFont: { size: 14, weight: 'bold' },
+          bodyFont: { size: 14 },
           borderColor: '#0066cc',
-          borderWidth: 1,
+          borderWidth: 2,
           padding: 12,
           displayColors: true,
           callbacks: {
             label: function(context) {
-              return `Sales: THB ${context.parsed.y.toFixed(2)}`;
+              return `Sales: THB ${context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
             }
           }
         }
@@ -944,23 +954,25 @@ function renderDailySalesTrendChart(orders) {
           beginAtZero: true,
           ticks: {
             color: '#ffffff',
-            font: { weight: 'bold' },
+            font: { weight: 'bold', size: 12 },
             callback: function(value) {
-              return 'THB ' + value.toFixed(0);
+              return 'THB ' + value.toLocaleString();
             }
           },
           grid: {
-            color: 'rgba(255, 255, 255, 0.1)',
+            color: 'rgba(255, 255, 255, 0.15)',
             drawBorder: false
           }
         },
         x: {
           ticks: {
             color: '#ffffff',
-            font: { weight: 'bold' }
+            font: { weight: 'bold', size: 11 },
+            maxRotation: 45,
+            minRotation: 45
           },
           grid: {
-            color: 'rgba(255, 255, 255, 0.05)',
+            color: 'rgba(255, 255, 255, 0.1)',
             drawBorder: false
           }
         }
@@ -997,9 +1009,9 @@ function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
           '#0066cc',
           '#f0ad4e'
         ],
-        borderColor: '#000000',
-        borderWidth: 2,
-        hoverOffset: 10
+        borderColor: '#1a1a1a',
+        borderWidth: 3,
+        hoverOffset: 15
       }]
     },
     options: {
@@ -1011,16 +1023,20 @@ function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
           position: 'bottom',
           labels: {
             color: '#ffffff',
-            font: { weight: 'bold', size: 12 },
-            padding: 15,
+            font: { weight: 'bold', size: 13 },
+            padding: 20,
+            usePointStyle: true,
+            pointStyle: 'circle',
             generateLabels: function(chart) {
               const data = chart.data;
               return data.labels.map((label, i) => {
                 const value = data.datasets[0].data[i];
                 const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                 return {
-                  text: `${label}: THB ${value.toFixed(2)} (${percentage}%)`,
+                  text: `${label}: THB ${value.toLocaleString(undefined, {minimumFractionDigits: 2})} (${percentage}%)`,
                   fillStyle: data.datasets[0].backgroundColor[i],
+                  strokeStyle: data.datasets[0].backgroundColor[i],
+                  lineWidth: 0,
                   hidden: false,
                   index: i
                 };
@@ -1029,21 +1045,24 @@ function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
           }
         },
         tooltip: {
-          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
           titleColor: '#ffffff',
           bodyColor: '#ffffff',
+          titleFont: { size: 14, weight: 'bold' },
+          bodyFont: { size: 14 },
           borderColor: '#0066cc',
-          borderWidth: 1,
+          borderWidth: 2,
           padding: 12,
           callbacks: {
             label: function(context) {
               const value = context.parsed;
               const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-              return `${context.label}: THB ${value.toFixed(2)} (${percentage}%)`;
+              return `${context.label}: THB ${value.toLocaleString(undefined, {minimumFractionDigits: 2})} (${percentage}%)`;
             }
           }
         }
-      }
+      },
+      cutout: '60%'
     }
   });
 }
