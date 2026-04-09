@@ -227,6 +227,24 @@
           </div>
         </div>
 
+        <!-- Charts Section -->
+        <div class="row g-3 mt-4 mb-4">
+          <!-- Daily Sales Trend Chart -->
+          <div class="col-lg-6">
+            <h2 class="h5 mb-3">Daily Sales Trend <span class="moving-emoji">📈</span></h2>
+            <div class="chart-container" style="position: relative; height: 300px; background: rgba(26, 26, 26, 0.7); border: 1px solid rgba(200, 136, 46, 0.2); border-radius: 1rem; padding: 1.5rem;">
+              <canvas id="dailySalesTrendChart"></canvas>
+            </div>
+          </div>
+          <!-- Payment Method Pie Chart -->
+          <div class="col-lg-6">
+            <h2 class="h5 mb-3">Payment Method Breakdown <span class="moving-emoji">💳</span></h2>
+            <div class="chart-container" style="position: relative; height: 300px; background: rgba(26, 26, 26, 0.7); border: 1px solid rgba(200, 136, 46, 0.2); border-radius: 1rem; padding: 1.5rem;">
+              <canvas id="paymentMethodChart"></canvas>
+            </div>
+          </div>
+        </div>
+
         <!-- Order Entries Table -->
         <h2 class="h5 mt-4 mb-3">Order Entries + Detailed Sales Record <span class="moving-emoji">📊</span></h2>
         <div class="table-responsive order-entries-table-wrap">

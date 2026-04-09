@@ -958,6 +958,11 @@ async function syncFromLoyverse() {
       fetchStaff(date);
     }
     
+    // Update charts after sync
+    if (typeof window.updateChartsAfterSync === 'function') {
+      window.updateChartsAfterSync();
+    }
+    
   } catch (e) { 
     if (requestId !== activeSyncRequestId) {
       return;
@@ -984,8 +989,10 @@ function setButtonLoading(button, text, isLoading) {
   if (isLoading) {
     button.dataset.originalText = button.innerHTML;
     button.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${text}`;
+    button.classList.add('pulse-effect');
   } else {
     button.innerHTML = button.dataset.originalText || 'Sync From Loyverse';
+    button.classList.remove('pulse-effect');
   }
 }
 

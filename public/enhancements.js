@@ -830,3 +830,242 @@ async function removeClosingStaff(id, date) {
 }
 
 setupRealtimeListener();
+
+
+/**
+ * Chart rendering functions for Daily Sales Trend and Payment Method Breakdown
+ */
+let dailySalesTrendChart = null;
+let paymentMethodChart = null;
+
+/**
+ * Extract hourly sales data from synced orders
+ */
+function extractHourlySalesData(orders) {
+  if (!Array.isArray(orders)) return {};
+  
+  const hourlyData = {};
+  
+  orders.forEach(order => {
+    if (!order.time) return;
+    
+    try {
+      const date = new Date(order.time);
+      const hour = date.getHours();
+      const hourKey = `${hour.toString().padStart(2, '0')}:00`;
+      
+      if (!hourlyData[hourKey]) {
+        hourlyData[hourKey] = 0;
+      }
+      
+      // Add the order amount (mainAndAccPrice + fbPrice)
+      const mainPrice = parseNumber(order.mainAndAccPrice || 0);
+      const fbPrice = parseNumber(order.fbPrice || 0);
+      hourlyData[hourKey] += mainPrice + fbPrice;
+    } catch (e) {
+      console.error('Error processing order time:', e);
+    }
+  });
+  
+  return hourlyData;
+}
+
+/**
+ * Render Daily Sales Trend Line Chart
+ */
+function renderDailySalesTrendChart(orders) {
+  const ctx = document.getElementById('dailySalesTrendChart');
+  if (!ctx) return;
+  
+  const hourlyData = extractHourlySalesData(orders);
+  
+  // Generate all hours of the day
+  const hours = [];
+  const salesData = [];
+  for (let i = 0; i < 24; i++) {
+    const hourKey = `${i.toString().padStart(2, '0')}:00`;
+    hours.push(hourKey);
+    salesData.push(hourlyData[hourKey] || 0);
+  }
+  
+  // Destroy existing chart if it exists
+  if (dailySalesTrendChart) {
+    dailySalesTrendChart.destroy();
+  }
+  
+  dailySalesTrendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: hours,
+      datasets: [{
+        label: 'Sales (THB)',
+        data: salesData,
+        borderColor: '#0066cc',
+        backgroundColor: 'rgba(0, 102, 204, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 4,
+        pointBackgroundColor: '#0066cc',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          labels: {
+            color: '#ffffff',
+            font: { weight: 'bold', size: 12 },
+            padding: 15
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          borderColor: '#0066cc',
+          borderWidth: 1,
+          padding: 12,
+          displayColors: true,
+          callbacks: {
+            label: function(context) {
+              return `Sales: THB ${context.parsed.y.toFixed(2)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: '#ffffff',
+            font: { weight: 'bold' },
+            callback: function(value) {
+              return 'THB ' + value.toFixed(0);
+            }
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)',
+            drawBorder: false
+          }
+        },
+        x: {
+          ticks: {
+            color: '#ffffff',
+            font: { weight: 'bold' }
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.05)',
+            drawBorder: false
+          }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Render Payment Method Pie Chart
+ */
+function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
+  const ctx = document.getElementById('paymentMethodChart');
+  if (!ctx) return;
+  
+  const cash = parseNumber(cashTotal) || 0;
+  const card = parseNumber(cardTotal) || 0;
+  const transfer = parseNumber(transferTotal) || 0;
+  const total = cash + card + transfer;
+  
+  // Destroy existing chart if it exists
+  if (paymentMethodChart) {
+    paymentMethodChart.destroy();
+  }
+  
+  paymentMethodChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Cash', 'Card', 'Transfer'],
+      datasets: [{
+        data: [cash, card, transfer],
+        backgroundColor: [
+          '#2ecc8a',
+          '#0066cc',
+          '#f0ad4e'
+        ],
+        borderColor: '#000000',
+        borderWidth: 2,
+        hoverOffset: 10
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: {
+            color: '#ffffff',
+            font: { weight: 'bold', size: 12 },
+            padding: 15,
+            generateLabels: function(chart) {
+              const data = chart.data;
+              return data.labels.map((label, i) => {
+                const value = data.datasets[0].data[i];
+                const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                return {
+                  text: `${label}: THB ${value.toFixed(2)} (${percentage}%)`,
+                  fillStyle: data.datasets[0].backgroundColor[i],
+                  hidden: false,
+                  index: i
+                };
+              });
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          borderColor: '#0066cc',
+          borderWidth: 1,
+          padding: 12,
+          callbacks: {
+            label: function(context) {
+              const value = context.parsed;
+              const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+              return `${context.label}: THB ${value.toFixed(2)} (${percentage}%)`;
+            }
+          }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Update charts after sync
+ */
+window.updateChartsAfterSync = function() {
+  if (!window.lastSyncedData) return;
+  
+  const data = window.lastSyncedData;
+  
+  // Update Daily Sales Trend Chart
+  if (Array.isArray(data.orders) && data.orders.length > 0) {
+    renderDailySalesTrendChart(data.orders);
+  } else if (Array.isArray(data.automated_report_rows) && data.automated_report_rows.length > 0) {
+    renderDailySalesTrendChart(data.automated_report_rows);
+  }
+  
+  // Update Payment Method Chart
+  const cashTotal = data.cash_total || 0;
+  const cardTotal = data.card_total || 0;
+  const transferTotal = data.transfer_total || 0;
+  renderPaymentMethodChart(cashTotal, cardTotal, transferTotal);
+};
