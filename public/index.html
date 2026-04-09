@@ -52,6 +52,16 @@
             </div>
           </div>
           <div class="header-right">
+            <nav class="app-nav">
+              <ul class="nav-menu">
+                <li><a href="#reportSection">Report</a></li>
+                <li><a href="#paymentDetailsSection">Payments</a></li>
+                <li><a href="#closingStaffSection">Staff</a></li>
+                <li><a href="#expenseSection">Expenses</a></li>
+                <li><a href="#salesTrendSection">Sales Trend</a></li>
+                <li><a href="#orderEntriesSection">Records</a></li>
+              </ul>
+            </nav>
             <a
               class="made-by-tag"
               href="https://rhyzoe-portfolio.vercel.app"
@@ -122,7 +132,7 @@
           </div>
         </div>
 
-        <h2 class="h5 mt-4 mb-3">Order Payment Details <span class="moving-emoji">🧾</span></h2>
+        <h2 id="paymentDetailsSection" class="h5 mt-4 mb-3">Order Payment Details <span class="moving-emoji">🧾</span></h2>
         <div class="order-entries-table-wrap mb-4">
           <table class="table mb-0" id="unifiedPaymentTable">
             <thead>
@@ -231,7 +241,7 @@
         <!-- Charts Section -->
         <div class="row g-3 mt-4 mb-4">
           <!-- Daily Sales Trend Chart -->
-          <div class="col-lg-6">
+          <div id="salesTrendSection" class="col-lg-6">
             <h2 id="salesTrendTitle" class="h5 mb-3">Daily Sales Trend <span class="moving-emoji">📈</span></h2>
             <div class="chart-container" style="position: relative; height: 400px;">
               <canvas id="dailySalesTrendChart"></canvas>
@@ -247,7 +257,7 @@
         </div>
 
         <!-- Order Entries Table -->
-        <h2 class="h5 mt-4 mb-3">Order Entries + Detailed Sales Record <span class="moving-emoji">📊</span></h2>
+        <h2 id="orderEntriesSection" class="h5 mt-4 mb-3">Order Entries + Detailed Sales Record <span class="moving-emoji">📊</span></h2>
         <div class="table-responsive order-entries-table-wrap">
           <table class="table table-sm align-middle mb-0" id="orderEntriesTable">
             <thead>
