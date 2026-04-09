@@ -1253,15 +1253,113 @@ async function renderHistoricalSalesTrendChart() {
 }
 
 /**
+ * Extract hourly sales data from the Order Entries table in the DOM
+ */
+function extractHourlyDataFromTable() {
+  const hourlyData = {};
+  const rows = document.querySelectorAll('#orderEntriesBody tr.table-light');
+  
+  rows.forEach(row => {
+    const timeCell = row.cells[0];
+    const mainCell = row.cells[4];
+    const fbCell = row.cells[5];
+    
+    if (timeCell && mainCell && fbCell) {
+      const timeStr = timeCell.textContent.trim(); // e.g., "00:17"
+      const mainAmount = parseNumber(mainCell.textContent);
+      const fbAmount = parseNumber(fbCell.textContent);
+      
+      const hour = timeStr.split(':')[0];
+      const hourKey = `${hour.padStart(2, '0')}:00`;
+      
+      if (!hourlyData[hourKey]) {
+        hourlyData[hourKey] = 0;
+      }
+      hourlyData[hourKey] += (mainAmount + fbAmount);
+    }
+  });
+  
+  return hourlyData;
+}
+
+/**
  * Update charts after loading a persisted report
  * This function is called when loadReportData fetches aggregate data
  */
 window.updateChartsAfterReportLoad = function(data) {
   if (!data) return;
   
-  // For persisted reports, we don't have hourly breakdown data in the report object itself.
-  // However, we can show the historical trend instead of a placeholder.
-  renderHistoricalSalesTrendChart();
+  // Try to extract hourly data from the table first (as requested by user)
+  const hourlyDataFromTable = extractHourlyDataFromTable();
+  const hasTableData = Object.keys(hourlyDataFromTable).length > 0;
+  
+  if (hasTableData) {
+    // If we have data in the table, render the daily trend chart using that data
+    const hours = [];
+    const salesData = [];
+    for (let i = 0; i < 24; i++) {
+      const hourKey = `${i.toString().padStart(2, '0')}:00`;
+      hours.push(hourKey);
+      salesData.push(hourlyDataFromTable[hourKey] || 0);
+    }
+    
+    const ctx = document.getElementById('dailySalesTrendChart');
+    if (ctx) {
+      if (dailySalesTrendChart) dailySalesTrendChart.destroy();
+      dailySalesTrendChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: hours,
+          datasets: [{
+            label: 'Sales (THB)',
+            data: salesData,
+            borderColor: '#0066cc',
+            backgroundColor: 'rgba(0, 102, 204, 0.2)',
+            borderWidth: 3,
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: '#0066cc',
+            pointBorderColor: '#ffffff',
+            pointBorderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: true,
+              labels: { color: '#f5f1e8', font: { weight: 'bold', size: 14 }, padding: 20 }
+            },
+            tooltip: {
+              backgroundColor: 'rgba(0, 0, 0, 0.9)',
+              titleColor: '#ffffff',
+              bodyColor: '#ffffff',
+              padding: 12,
+              callbacks: {
+                label: (context) => `Sales: THB ${context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2})}`
+              }
+            }
+          },
+          scales: {
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#f5f1e8', font: { weight: 'bold', size: 12 }, callback: (v) => 'THB ' + v.toLocaleString() },
+              grid: { color: 'rgba(255, 255, 255, 0.15)', drawBorder: false }
+            },
+            x: {
+              ticks: { color: '#f5f1e8', font: { weight: 'bold', size: 11 } },
+              grid: { color: 'rgba(255, 255, 255, 0.1)', drawBorder: false }
+            }
+          }
+        }
+      });
+    }
+  } else {
+    // Fallback to historical trend if no table data
+    renderHistoricalSalesTrendChart();
+  }
   
   // Update Payment Method Chart with the available totals
   const cashTotal = data.cash_total || 0;
