@@ -1088,3 +1088,101 @@ window.updateChartsAfterSync = function() {
   const transferTotal = data.transfer_total || 0;
   renderPaymentMethodChart(cashTotal, cardTotal, transferTotal);
 };
+
+/**
+ * Render a placeholder chart when raw order data is not available
+ * This is used when loading a persisted report that only has aggregate totals
+ */
+function renderPlaceholderChart() {
+  const ctx = document.getElementById('dailySalesTrendChart');
+  if (!ctx) return;
+  
+  // Destroy existing chart if it exists
+  if (dailySalesTrendChart) {
+    dailySalesTrendChart.destroy();
+  }
+  
+  // Create a simple placeholder chart showing that data is not available for detailed view
+  dailySalesTrendChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: Array.from({length: 24}, (_, i) => `${i.toString().padStart(2, '0')}:00`),
+      datasets: [{
+        label: 'Sales (THB)',
+        data: Array(24).fill(0),
+        borderColor: '#999999',
+        backgroundColor: 'rgba(150, 150, 150, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 3,
+        pointBackgroundColor: '#999999',
+        pointBorderColor: '#ffffff',
+        pointBorderWidth: 2
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          labels: {
+            color: '#ffffff',
+            font: { weight: 'bold', size: 14 },
+            padding: 20
+          }
+        },
+        tooltip: {
+          enabled: false
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: {
+            color: '#ffffff',
+            font: { weight: 'bold', size: 12 },
+            callback: function(value) {
+              return 'THB ' + value.toLocaleString();
+            }
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.15)',
+            drawBorder: false
+          }
+        },
+        x: {
+          ticks: {
+            color: '#999999',
+            font: { weight: 'bold', size: 11 },
+            maxRotation: 45,
+            minRotation: 45
+          },
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)',
+            drawBorder: false
+          }
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Update charts after loading a persisted report
+ * This function is called when loadReportData fetches aggregate data
+ */
+window.updateChartsAfterReportLoad = function(data) {
+  if (!data) return;
+  
+  // For persisted reports, we don't have hourly breakdown data
+  // So we render a placeholder chart
+  renderPlaceholderChart();
+  
+  // Update Payment Method Chart with the available totals
+  const cashTotal = data.cash_total || 0;
+  const cardTotal = data.card_total || 0;
+  const transferTotal = data.transfer_total || 0;
+  renderPaymentMethodChart(cashTotal, cardTotal, transferTotal);
+};

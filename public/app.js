@@ -1018,6 +1018,11 @@ window.loadReportData = async function(date) {
         if (els.totalGramsSold) els.totalGramsSold.innerText = (data.total_grams || 0).toFixed(3) + ' G';
         if (els.orderEntriesFbTotal) els.orderEntriesFbTotal.textContent = formatCurrency(data.fb_total || 0);
         
+        // Update charts with the loaded report data
+        if (typeof window.updateChartsAfterReportLoad === 'function') {
+          window.updateChartsAfterReportLoad(data);
+        }
+        
         // Load staff and expenses explicitly
         if (typeof fetchStaff === 'function') fetchStaff(date);
         if (typeof fetchExpenses === 'function') fetchExpenses(date);
