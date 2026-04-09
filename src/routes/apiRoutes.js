@@ -5,6 +5,7 @@ const {
   upsertReport,
   listReports,
   getLast7DayNetSales,
+  getMonthlyNetSales,
   getReportsSummary,
   exportToExcel,
   addExpense,
@@ -52,6 +53,7 @@ router.get('/loyverse/debug-items', async (req, res) => {
 });
 
 router.get('/reports/last-7/net-sales', getLast7DayNetSales);
+router.get('/reports/monthly/net-sales', getMonthlyNetSales);
 router.get('/reports/summary', getReportsSummary);
 router.get('/reports', listReports);
 router.get('/reports/:date', getReportByDate);

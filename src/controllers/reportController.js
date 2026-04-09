@@ -380,6 +380,27 @@ async function getLast7DayNetSales(req, res, next) {
   }
 }
 
+async function getMonthlyNetSales(req, res, next) {
+  try {
+    const tz = process.env.LOYVERSE_TIMEZONE || 'Asia/Bangkok';
+    const now = dayjs().tz(tz);
+    const startOfMonth = now.startOf('month').format('YYYY-MM-DD');
+    const today = now.format('YYYY-MM-DD');
+
+    const rows = await query(
+      `SELECT date, net_sale
+       FROM daily_reports
+       WHERE date >= ${placeholder(1)} AND date <= ${placeholder(2)}
+       ORDER BY date ASC`,
+      [startOfMonth, today]
+    );
+    
+    return res.json(Array.isArray(rows) ? rows : []);
+  } catch (error) {
+    return next(error);
+  }
+}
+
 async function getReportsSummary(req, res, next) {
   try {
     const { from, to } = req.query;
@@ -697,6 +718,7 @@ module.exports = {
   upsertReport,
   listReports,
   getLast7DayNetSales,
+  getMonthlyNetSales,
   getReportsSummary,
   exportToExcel,
   addExpense,

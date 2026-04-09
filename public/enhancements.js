@@ -884,6 +884,12 @@ function extractHourlySalesData(orders) {
 function renderDailySalesTrendChart(orders) {
   const ctx = document.getElementById('dailySalesTrendChart');
   if (!ctx) return;
+
+  // Update title to Daily Sales Trend
+  const titleEl = document.getElementById('salesTrendTitle');
+  if (titleEl) {
+    titleEl.innerHTML = 'Daily Sales Trend <span class="moving-emoji">📈</span>';
+  }
   
   const hourlyData = extractHourlySalesData(orders);
   
@@ -1183,20 +1189,27 @@ function renderPlaceholderChart() {
 }
 
 /**
- * Render Historical Sales Trend Chart (Last 7 Days)
+ * Render Monthly Sales Trend Chart (From 1st of current month to today)
  */
 async function renderHistoricalSalesTrendChart() {
   const ctx = document.getElementById('dailySalesTrendChart');
   if (!ctx) return;
 
   try {
-    const res = await fetch('/api/reports/last-7/net-sales');
-    if (!res.ok) throw new Error('Failed to fetch historical data');
+    const res = await fetch('/api/reports/monthly/net-sales');
+    if (!res.ok) throw new Error('Failed to fetch monthly data');
     
     const data = await res.json();
     if (!Array.isArray(data) || data.length === 0) {
       renderPlaceholderChart();
       return;
+    }
+
+    // Update title to Monthly Sales Trend
+    const titleEl = document.getElementById('salesTrendTitle');
+    if (titleEl) {
+      const monthName = new Date().toLocaleString('default', { month: 'long' });
+      titleEl.innerHTML = `${monthName} Sales Trend <span class="moving-emoji">📈</span>`;
     }
 
     // Sort by date ascending
@@ -1259,7 +1272,7 @@ async function renderHistoricalSalesTrendChart() {
       }
     });
   } catch (err) {
-    console.error('Historical chart error:', err);
+    console.error('Monthly chart error:', err);
     renderPlaceholderChart();
   }
 }
