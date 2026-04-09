@@ -468,7 +468,7 @@ body {
 
 @keyframes speech-bubble {
   0%, 35%, 65%, 100% { opacity: 0; transform: translateY(0) scale(0.5); }
-  40%, 60% { opacity: 1; transform: translateY(-35px) scale(1); }
+  40%, 60% { opacity: 1; transform: translateY(-45px) scale(1); }
 }
 
 /* Specific buzz for mobile where the flower is further away */
@@ -482,7 +482,7 @@ body {
   }
   @keyframes speech-bubble {
     0%, 35%, 65%, 100% { opacity: 0; transform: translateY(0) scale(0.5); }
-    40%, 60% { opacity: 1; transform: translateY(-45px) scale(1); }
+    40%, 60% { opacity: 1; transform: translateY(-55px) scale(1); }
   }
 }
 
