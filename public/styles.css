@@ -15,7 +15,7 @@
 
 html {
   scroll-behavior: smooth;
-  scroll-padding-top: 200px; /* Further increased to ensure section headers are fully visible below the compact sticky nav */
+  scroll-padding-top: 240px; /* Increased to ensure section headers are fully visible with proper gap below the compact sticky nav */
 }
 
 * {
