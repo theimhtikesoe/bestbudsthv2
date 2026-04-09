@@ -112,9 +112,9 @@ body {
   display: flex;
   align-items: center;
   position: relative;
-  margin-left: 40px;
+  margin-left: 20px;
   height: 40px;
-  width: 120px;
+  width: 60px;
   overflow: visible;
 }
 
@@ -420,9 +420,9 @@ body {
   0% { left: 100vw; transform: scaleX(-1); } /* Start from right edge */
   25% { left: 50%; transform: scaleX(-1); } /* Reach flower */
   40% { left: 50%; transform: scaleX(-1) translateY(-5px); } /* Hover at flower */
-  50% { left: 40%; transform: scaleX(-1) translateY(-20px) rotate(-15deg); } /* Start loop up */
-  60% { left: 30%; transform: scaleX(-1) translateY(20px) rotate(15deg); } /* Loop down */
-  75% { left: 20%; transform: scaleX(-1) translateY(0) rotate(0deg); } /* Straighten out */
+  50% { left: 30%; transform: scaleX(-1) translateY(-30px) rotate(-20deg); } /* Loop up */
+  65% { left: 10%; transform: scaleX(-1) translateY(30px) rotate(20deg); } /* Loop down */
+  80% { left: -10%; transform: scaleX(-1) translateY(0) rotate(0deg); } /* Straighten out */
   100% { left: -100vw; transform: scaleX(-1); } /* Exit left */
 }
 
@@ -434,16 +434,16 @@ body {
 .nav-mascot {
   display: inline-block;
   font-size: 1.5rem;
-  animation: bee-journey 15s linear infinite; /* Slower for more complex movement */
+  animation: bee-journey 15s linear infinite;
   z-index: 5;
-  position: absolute; /* Relative to bee-container for easier alignment */
-  top: 0;
+  position: fixed; /* Fixed to viewport for full screen crossing */
+  top: 75px; /* Aligned with sunflower in header */
   pointer-events: none;
 }
 
 .bee-speech {
-  position: absolute;
-  top: -45px;
+  position: fixed;
+  top: 30px; /* Positioned above the bee's fixed top */
   background: white;
   color: #333;
   padding: 6px 12px;
@@ -532,6 +532,14 @@ h2 {
 
   .nav-menu a {
     font-size: 0.8rem;
+  }
+
+  .nav-mascot {
+    top: 180px; /* Adjusted for mobile header height */
+  }
+
+  .bee-speech {
+    top: 135px;
   }
   
   .brand-wrap {
