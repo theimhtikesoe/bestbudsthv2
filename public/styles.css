@@ -82,22 +82,25 @@ body {
 .made-by-tag {
   display: inline-flex;
   align-items: center;
-  border: 1px solid var(--glass-border);
-  background: rgba(200, 136, 46, 0.1);
-  color: var(--accent);
+  border: 1px solid rgba(200, 136, 46, 0.15);
+  background: rgba(26, 26, 26, 0.6);
+  color: #e0a040;
   border-radius: 999px;
-  padding: 8px 16px;
+  padding: 8px 20px;
   font-weight: 700;
   font-size: 0.85rem;
   text-decoration: none;
-  transition: all 0.3s ease;
-  backdrop-filter: blur(5px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
 }
 
 .made-by-tag:hover {
   background: rgba(200, 136, 46, 0.2);
-  color: var(--accent-strong);
+  color: #ffffff;
   transform: translateY(-2px);
+  border-color: rgba(200, 136, 46, 0.4);
+  box-shadow: 0 6px 20px rgba(200, 136, 46, 0.2);
 }
 
 /* Layout Containers */
@@ -331,40 +334,43 @@ body {
   75% { transform: translateY(-5px) rotate(-5deg); }
 }
 
-@keyframes buzz {
-  0%, 100% { transform: translateX(0) translateY(0); }
-  20% { transform: translateX(-10px) translateY(-2px); }
-  40% { transform: translateX(-125px) translateY(0); }
-  60% { transform: translateX(-125px) translateY(0); }
-  80% { transform: translateX(-10px) translateY(2px); }
+@keyframes bee-journey {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  10% { transform: translate(-20px, -10px) rotate(-10deg); }
+  30% { transform: translate(-135px, 0) rotate(0deg); } /* At Flower */
+  45% { transform: translate(-135px, 0) rotate(0deg); } /* Stay at Flower */
+  60% { transform: translate(-70px, -20px) rotate(10deg); } /* Flying back */
+  75% { transform: translate(-10px, -5px) rotate(0deg); } /* Near Hive */
+  85% { transform: translate(0, 0) scale(0.8); opacity: 0.5; } /* Entering Hive */
 }
 
 @keyframes speech-bubble {
-  0%, 35%, 65%, 100% { opacity: 0; transform: translateY(0) scale(0.5); }
-  40%, 60% { opacity: 1; transform: translateY(-75px) scale(1); }
+  0%, 25%, 55%, 100% { opacity: 0; transform: translateY(0) scale(0.5); }
+  30%, 50% { opacity: 1; transform: translateY(-75px) scale(1); }
 }
 
 .nav-mascot {
   display: inline-block;
   font-size: 1.5rem;
   margin-right: 8px;
-  animation: buzz 8s ease-in-out infinite;
+  animation: bee-journey 10s ease-in-out infinite;
+  z-index: 5;
 }
 
 .bee-speech {
   position: absolute;
   background: white;
   color: #333;
-  padding: 4px 10px;
-  border-radius: 12px;
+  padding: 6px 12px;
+  border-radius: 14px;
   font-size: 0.75rem;
   font-weight: 800;
   white-space: nowrap;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+  box-shadow: 0 6px 15px rgba(0,0,0,0.4);
   opacity: 0;
-  animation: speech-bubble 8s ease-in-out infinite;
+  animation: speech-bubble 10s ease-in-out infinite;
   z-index: 10;
-  left: -125px;
+  left: -135px;
   pointer-events: none;
 }
 
@@ -383,8 +389,18 @@ body {
   display: inline-block;
   font-size: 1.5rem;
   position: absolute;
-  left: -135px;
+  left: -145px;
   pointer-events: none;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 0, 0.2));
+}
+
+.hive-emoji {
+  display: inline-block;
+  font-size: 1.5rem;
+  position: absolute;
+  left: 10px;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(255, 165, 0, 0.3));
 }
 
 /* Headings */
@@ -411,17 +427,22 @@ h2 {
     max-height: 80px;
   }
 
-  @keyframes buzz {
-    0%, 100% { transform: translateX(0) translateY(0); }
-    40% { transform: translateX(-195px) translateY(0); }
-    60% { transform: translateX(-195px) translateY(0); }
+  @keyframes bee-journey {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    30% { transform: translate(-205px, 0) rotate(0deg); }
+    45% { transform: translate(-205px, 0) rotate(0deg); }
+    85% { transform: translate(0, 0) scale(0.8); opacity: 0.5; }
   }
 
   .bee-speech {
-    left: -195px;
+    left: -205px;
   }
 
   .flower-emoji {
-    left: -205px;
+    left: -215px;
+  }
+  
+  .hive-emoji {
+    left: 5px;
   }
 }
