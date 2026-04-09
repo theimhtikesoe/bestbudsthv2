@@ -905,7 +905,7 @@ function renderDailySalesTrendChart(orders) {
     type: 'line',
     data: {
       labels: hours,
-      datasets: [{
+        datasets: [{
         label: 'Sales (THB)',
         data: salesData,
         borderColor: '#0066cc',
@@ -927,7 +927,7 @@ function renderDailySalesTrendChart(orders) {
         legend: {
           display: true,
           labels: {
-            color: '#ffffff',
+            color: '#f5f1e8',
             font: { weight: 'bold', size: 14 },
             padding: 20
           }
@@ -953,7 +953,7 @@ function renderDailySalesTrendChart(orders) {
         y: {
           beginAtZero: true,
           ticks: {
-            color: '#ffffff',
+            color: '#f5f1e8',
             font: { weight: 'bold', size: 12 },
             callback: function(value) {
               return 'THB ' + value.toLocaleString();
@@ -966,7 +966,7 @@ function renderDailySalesTrendChart(orders) {
         },
         x: {
           ticks: {
-            color: '#ffffff',
+            color: '#f5f1e8',
             font: { weight: 'bold', size: 11 },
             maxRotation: 45,
             minRotation: 45
@@ -1022,7 +1022,7 @@ function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
           display: true,
           position: 'bottom',
           labels: {
-            color: '#ffffff',
+            color: '#f5f1e8',
             font: { weight: 'bold', size: 13 },
             padding: 20,
             usePointStyle: true,
@@ -1036,6 +1036,7 @@ function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
                   text: `${label}: THB ${value.toLocaleString(undefined, {minimumFractionDigits: 2})} (${percentage}%)`,
                   fillStyle: data.datasets[0].backgroundColor[i],
                   strokeStyle: data.datasets[0].backgroundColor[i],
+                  fontColor: '#f5f1e8',
                   lineWidth: 0,
                   hidden: false,
                   index: i
@@ -1128,7 +1129,7 @@ function renderPlaceholderChart() {
         legend: {
           display: true,
           labels: {
-            color: '#ffffff',
+            color: '#f5f1e8',
             font: { weight: 'bold', size: 14 },
             padding: 20
           }
@@ -1141,7 +1142,7 @@ function renderPlaceholderChart() {
         y: {
           beginAtZero: true,
           ticks: {
-            color: '#ffffff',
+            color: '#f5f1e8',
             font: { weight: 'bold', size: 12 },
             callback: function(value) {
               return 'THB ' + value.toLocaleString();
@@ -1170,15 +1171,97 @@ function renderPlaceholderChart() {
 }
 
 /**
+ * Render Historical Sales Trend Chart (Last 7 Days)
+ */
+async function renderHistoricalSalesTrendChart() {
+  const ctx = document.getElementById('dailySalesTrendChart');
+  if (!ctx) return;
+
+  try {
+    const res = await fetch('/api/reports/last-7/net-sales');
+    if (!res.ok) throw new Error('Failed to fetch historical data');
+    
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      renderPlaceholderChart();
+      return;
+    }
+
+    // Sort by date ascending
+    const sortedData = data.sort((a, b) => new Date(a.date) - new Date(b.date));
+    const labels = sortedData.map(d => {
+      const date = new Date(d.date);
+      return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    });
+    const salesValues = sortedData.map(d => parseNumber(d.net_sale));
+
+    if (dailySalesTrendChart) dailySalesTrendChart.destroy();
+
+    dailySalesTrendChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Daily Net Sales (THB)',
+          data: salesValues,
+          borderColor: '#ffcc00',
+          backgroundColor: 'rgba(255, 204, 0, 0.2)',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 5,
+          pointBackgroundColor: '#ffcc00',
+          pointBorderColor: '#ffffff',
+          pointBorderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: true,
+            labels: { color: '#f5f1e8', font: { weight: 'bold', size: 14 }, padding: 20 }
+          },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.9)',
+            titleColor: '#ffffff',
+            bodyColor: '#ffffff',
+            padding: 12,
+            callbacks: {
+              label: (context) => `Sales: THB ${context.parsed.y.toLocaleString(undefined, {minimumFractionDigits: 2})}`
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { color: '#f5f1e8', font: { weight: 'bold', size: 12 }, callback: (v) => 'THB ' + v.toLocaleString() },
+            grid: { color: 'rgba(255, 255, 255, 0.15)', drawBorder: false }
+          },
+          x: {
+            ticks: { color: '#f5f1e8', font: { weight: 'bold', size: 11 } },
+            grid: { color: 'rgba(255, 255, 255, 0.1)', drawBorder: false }
+          }
+        }
+      }
+    });
+  } catch (err) {
+    console.error('Historical chart error:', err);
+    renderPlaceholderChart();
+  }
+}
+
+/**
  * Update charts after loading a persisted report
  * This function is called when loadReportData fetches aggregate data
  */
 window.updateChartsAfterReportLoad = function(data) {
   if (!data) return;
   
-  // For persisted reports, we don't have hourly breakdown data
-  // So we render a placeholder chart
-  renderPlaceholderChart();
+  // For persisted reports, we don't have hourly breakdown data in the report object itself.
+  // However, we can show the historical trend instead of a placeholder.
+  renderHistoricalSalesTrendChart();
   
   // Update Payment Method Chart with the available totals
   const cashTotal = data.cash_total || 0;
