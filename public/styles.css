@@ -417,23 +417,23 @@ body {
 }
 
 @keyframes bee-journey {
-  0% { left: -20%; transform: scaleX(1); }
-  20% { left: 0%; transform: scaleX(1) translateY(0) rotate(0deg); }
-  35% { left: 10%; transform: scaleX(1) translateY(-15px) rotate(-10deg); }
-  50% { left: 30%; transform: scaleX(1) translateY(-20px) rotate(0deg); }
-  60% { left: 50%; transform: scaleX(1) translateY(-15px); }
-  75% { left: 75%; transform: scaleX(1); }
-  100% { left: 100%; transform: scaleX(1); }
+  0% { right: -20%; transform: scaleX(-1); }
+  20% { right: 0%; transform: scaleX(-1) translateY(0) rotate(0deg); }
+  35% { right: 10%; transform: scaleX(-1) translateY(-15px) rotate(-10deg); }
+  50% { right: 30%; transform: scaleX(-1) translateY(-20px) rotate(0deg); }
+  60% { right: 50%; transform: scaleX(-1) translateY(-15px); }
+  75% { right: 75%; transform: scaleX(-1); }
+  100% { right: 100%; transform: scaleX(-1); }
 }
 
 @keyframes bee-journey-ltr {
-  0% { left: -20%; transform: scaleX(1); }
-  20% { left: 0%; transform: scaleX(1) translateY(0) rotate(0deg); }
-  35% { left: 10%; transform: scaleX(1) translateY(15px) rotate(10deg); }
-  50% { left: 30%; transform: scaleX(1) translateY(20px) rotate(0deg); }
-  60% { left: 50%; transform: scaleX(1) translateY(15px); }
-  75% { left: 75%; transform: scaleX(1); }
-  100% { left: 100%; transform: scaleX(1); }
+  0% { right: -20%; transform: scaleX(-1); }
+  20% { right: 0%; transform: scaleX(-1) translateY(0) rotate(0deg); }
+  35% { right: 10%; transform: scaleX(-1) translateY(15px) rotate(10deg); }
+  50% { right: 30%; transform: scaleX(-1) translateY(20px) rotate(0deg); }
+  60% { right: 50%; transform: scaleX(-1) translateY(15px); }
+  75% { right: 75%; transform: scaleX(-1); }
+  100% { right: 100%; transform: scaleX(-1); }
 }
 
 .nav-mascot {
