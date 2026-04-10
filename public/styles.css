@@ -437,6 +437,14 @@ body {
   pointer-events: none;
 }
 
+.second-bee {
+  animation: bee-journey 18s linear infinite reverse;
+  font-size: 1rem;
+  opacity: 0.7;
+  left: 10%;
+  top: 60%;
+}
+
 /* Headings */
 h2 {
   color: #ffffff !important;
