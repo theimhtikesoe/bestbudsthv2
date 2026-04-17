@@ -662,6 +662,8 @@ function processOrdersData(data) {
       const fbKeywords = [
         'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
         'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
+        'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 
+        'cocacola', 'coke', 'sprite', 'tonic water', 'soda water',
         'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
       ];
 
@@ -677,8 +679,8 @@ function processOrdersData(data) {
       let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
       let isLobbyShirt = itemName.includes('the lobby shirt');
       
-      let isFB = !isFlowerStrain && !isThcGummy && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
-                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
+      let isFB = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
 
       // Fallback to price if not clearly classified by name
       if (!isFlowerStrain && !isFB && !isAccessory) {
@@ -760,6 +762,8 @@ function processAutomatedReportRows(data) {
       const fbKeywords = [
         'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
         'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
+        'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 
+        'cocacola', 'coke', 'sprite', 'tonic water', 'soda water',
         'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
       ];
 
@@ -775,8 +779,8 @@ function processAutomatedReportRows(data) {
       let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
       let isLobbyShirt = itemName.includes('the lobby shirt');
       
-      let isFB = !isFlowerStrain && !isThcGummy && (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
-                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time')));
+      let isFB = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
 
       // Fallback to price if not clearly classified by name
       if (!isFlowerStrain && !isFB && !isAccessory) {

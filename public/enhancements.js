@@ -260,7 +260,7 @@ function processItemsForExcel(receipts) {
       const discountStr = totalItemDiscount > 0.01 ? `${discountPercent.toFixed(0)}%` : "-";
 
       const flowerStrains = ['grape soda', 'blue pave', 'devil driver', 'lemon cherry gelato', 'moonbow', 'emergen c', 'tea time', 'silver shadow', 'rozay cake', 'truffaloha', 'the planet of grape', 'crunch berriez', 'big foot', 'honey bee', 'jealousy mintz', 'crystal candy', 'alien mint', 'rocket fuel', 'gold dust', 'darth vader', 'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz', 'free pina colada', 'thc gummy', 'flower', 'bud', 'pre-roll', 'joint'];
-      const fbKeywords = ['water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice', 'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 'cocacola', 'coke', 'sprite', 'tonic water', 'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'];
+      const fbKeywords = ['water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice', 'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 'cocacola', 'coke', 'sprite', 'tonic water', 'soda water', 'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'];
       const accessoryKeywords = ['accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder', 'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray', 'pipe', 'small pipe', 'best buds grinder', 'best buds shirt'];
 
       let isThcGummy = itemName.includes("thc gummy");
@@ -268,7 +268,6 @@ function processItemsForExcel(receipts) {
       
       let isFB = !isAccessory && (
         fbKeywords.some(k => itemName.includes(k) || category.includes(k)) ||
-        itemName.includes('budweiser') ||
         category.includes('soft drink') || 
         category.includes('snacks') || 
         category.includes('beverage') ||
