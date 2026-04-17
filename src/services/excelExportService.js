@@ -75,7 +75,9 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
 
   const fbKeywords = [
     'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
-    'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
+    'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice', 
+    'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 
+    'cocacola', 'coke', 'sprite', 'tonic water',
     'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
   ];
   
@@ -200,7 +202,10 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
 
       const discountStr = totalItemDiscount > 0.01 ? `${discountPercent.toFixed(0)}% (${totalItemDiscount.toFixed(2)} THB)` : '-';
 
-      let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+      let isFlowerStrain = flowerStrains.some(strain => {
+        if (strain === 'bud' && itemName.includes('budweiser')) return false;
+        return itemName.includes(strain);
+      });
       let isThcGummy = itemName.includes('thc gummy');
       let isAccessory = accessoryKeywords.some(k => itemName.includes(k) || category.includes(k));
       let isLobbyShirt = itemName.includes('the lobby shirt');

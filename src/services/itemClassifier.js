@@ -16,7 +16,9 @@ const MAIN_KEYWORDS = [
 
 const FB_KEYWORDS = [
   'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
-  'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice', 'corona', 'sato',
+  'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice', 
+  'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 
+  'cocacola', 'coke', 'sprite', 'tonic water',
   'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
 ];
 
@@ -51,6 +53,10 @@ function classifyItem(itemName, categoryName = '', unitPrice = 0) {
   if (MAIN_KEYWORDS.some(keyword => {
     if (keyword === 'grape soda') {
       return name === 'grape soda' || name.includes('grape soda');
+    }
+    // Budweiser check - ensure it's not caught by 'bud'
+    if (keyword === 'bud' && name.includes('budweiser')) {
+      return false;
     }
     return name.includes(keyword);
   })) {
