@@ -1119,26 +1119,26 @@ function renderOrderEntriesTable(orderEntries, detailedItems = []) {
     }
 
     html += `
-      <tr class="table-light fw-semibold">
+      <tr class="table-summary-row fw-semibold">
         <td>${time}</td>
-        <td>${entry.receipt}</td>
-        <td>${entry.grams.toFixed(3)} G</td>
-        <td><span class="receipt-summary-label">Main/F&amp;B Total</span></td>
+        <td><span class="receipt-number-badge">${entry.receipt}</span></td>
+        <td><span class="detail-gram-badge">${entry.grams.toFixed(3)} G</span></td>
+        <td><span class="receipt-summary-label">Order Summary</span></td>
         <td class="text-end">${formatCompactNumber(entry.mainAndAccPrice)}</td>
         <td class="text-end">${formatCompactNumber(entry.fbPrice)}</td>
       </tr>
     `;
 
     detailRows.forEach((item) => {
-      const itemGram = item.gram || '-';
-      const mainValue = item.mainPrice > 0 ? formatCompactNumber(item.mainPrice) : '-';
-      const fbValue = item.fbPrice > 0 ? formatCompactNumber(item.fbPrice) : '-';
+      const itemGram = item.gram || '<span class="text-muted-soft">-</span>';
+      const mainValue = item.mainPrice > 0 ? formatCompactNumber(item.mainPrice) : '<span class="text-muted-soft">-</span>';
+      const fbValue = item.fbPrice > 0 ? formatCompactNumber(item.fbPrice) : '<span class="text-muted-soft">-</span>';
       html += `
         <tr class="detail-row">
-          <td></td>
-          <td><span class="mobile-item-inline">${item.itemName || '-'}</span></td>
+          <td class="text-muted-soft"></td>
+          <td class="text-muted-soft"></td>
           <td>${itemGram}</td>
-          <td>${item.itemName || '-'}</td>
+          <td class="detail-item-name">${item.itemName || '-'}</td>
           <td class="text-end">${mainValue}</td>
           <td class="text-end">${fbValue}</td>
         </tr>
