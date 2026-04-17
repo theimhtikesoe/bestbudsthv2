@@ -300,6 +300,11 @@ function processItemsForExcel(receipts) {
         totalFlowerGrams += qty;
       }
 
+      // Ensure displayType is properly defined before using it
+      if (typeof displayType === 'undefined' || displayType === null) {
+        displayType = isFB ? "F&B" : (isAccessory ? "Accessories" : "Flower/Main");
+      }
+
       const exportItem = {
         type: displayType,
         name: item.name || item.item_name,
