@@ -675,26 +675,36 @@ function processOrdersData(data) {
         'nf best buds shirt', 'sw best buds shirt'
       ];
 
-      let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
-      let isFB = (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
-                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'))) && !itemName.includes('gummy');
-      let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
+      let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
       let isLobbyShirt = itemName.includes('the lobby shirt');
 
-      // Fallback to price if not clearly classified by name
-      if (!isFlowerStrain && !isFB && !isAccessory) {
-        const unitPrice = grossPrice / (qty || 1);
-        if (unitPrice <= 50 && unitPrice > 0) {
-          isFB = true;
-        } else {
-          isFlowerStrain = true; // Default to Main/Flower
-        }
+      let isFB = !isAccessory && (
+        fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+        (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'))
+      );
+
+      // Exception: 'tea time' and 'gummy' should not be F&B
+      if (isFB && (itemName.includes('tea time') || itemName.includes('gummy'))) {
+        isFB = false;
       }
 
-      // Final override: if it's F&B or Accessory, it cannot be a Flower Strain
-      if (isFB || isAccessory) {
-        isFlowerStrain = false;
+      let isFlowerStrain = !isFB && !isAccessory && flowerStrains.some(strain => {
+        if (strain === 'grape soda') {
+          return itemName === 'grape soda' || itemName.includes('grape soda');
+        }
+        return itemName.includes(strain);
+      });
+
+      if (!isFlowerStrain && !isFB && !isThcGummy && !isAccessory) {
+        const unitPrice = grossPrice / (qty || 1);
+        if (unitPrice > 50) {
+          isFlowerStrain = true;
+        } else if (unitPrice > 0) {
+          isFB = true;
+        } else {
+          isFlowerStrain = true;
+        }
       }
 
       if (isFB) {
@@ -776,26 +786,36 @@ function processAutomatedReportRows(data) {
         'nf best buds shirt', 'sw best buds shirt'
       ];
 
-      let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
-      let isFB = (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
-                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'))) && !itemName.includes('gummy');
-      let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
+      let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
       let isLobbyShirt = itemName.includes('the lobby shirt');
 
-      // Fallback to price if not clearly classified by name
-      if (!isFlowerStrain && !isFB && !isAccessory) {
-        const unitPrice = price / (qty || 1);
-        if (unitPrice <= 50 && unitPrice > 0) {
-          isFB = true;
-        } else {
-          isFlowerStrain = true; // Default to Main/Flower
-        }
+      let isFB = !isAccessory && (
+        fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+        (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'))
+      );
+
+      // Exception: 'tea time' and 'gummy' should not be F&B
+      if (isFB && (itemName.includes('tea time') || itemName.includes('gummy'))) {
+        isFB = false;
       }
 
-      // Final override: if it's F&B or Accessory, it cannot be a Flower Strain
-      if (isFB || isAccessory) {
-        isFlowerStrain = false;
+      let isFlowerStrain = !isFB && !isAccessory && flowerStrains.some(strain => {
+        if (strain === 'grape soda') {
+          return itemName === 'grape soda' || itemName.includes('grape soda');
+        }
+        return itemName.includes(strain);
+      });
+
+      if (!isFlowerStrain && !isFB && !isThcGummy && !isAccessory) {
+        const unitPrice = price / (qty || 1);
+        if (unitPrice > 50) {
+          isFlowerStrain = true;
+        } else if (unitPrice > 0) {
+          isFB = true;
+        } else {
+          isFlowerStrain = true;
+        }
       }
 
       if (isFB) {
