@@ -18,7 +18,7 @@ const FB_KEYWORDS = [
   'water', 'soda', 'beer', 'drink', 'beverage', 'alcohol', 'wine', 
   'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice', 
   'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 
-  'cocacola', 'coke', 'sprite', 'tonic water',
+  'cocacola', 'coke', 'sprite', 'tonic water', 'soda water',
   'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
 ];
 

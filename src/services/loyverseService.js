@@ -584,9 +584,8 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
     const classification = itemClassifier.classifyItem(itemName, normalizedCategory, unitPrice);
     
     const isFlowerStrain = classification === 'main';
-    const isFB = classification === 'fb' || itemName.includes('budweiser');
+    const isFB = classification === 'fb';
     const isAcc = classification === 'accessory';
-    const isThcGummy = itemName.includes('thc gummy');
 
     // --- [3] THE BEST BUDS ROUTING LOGIC ---
     if (isFB) {
@@ -606,10 +605,12 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       mainGrossTotal += itemGrossTotal;
       
       // --- [NEW] Gram Exclusion Logic ---
+      // Strictly exclude F&B and Accessories from gram totals
+      // Also exclude specific items that might be classified as 'main' but shouldn't have grams
       const isLobbyShirt = itemName.includes('the lobby shirt');
+      const isThcGummy = itemName.includes('thc gummy');
       
-      // Exclude Lobby Shirt and THC Gummy from gram totals
-      if (!isLobbyShirt && !isThcGummy) {
+      if (!isFB && !isAcc && !isLobbyShirt && !isThcGummy) {
         totalGram += qty;
         if (!mainItemName) {
           mainItemName = String(lineItem.item_name || lineItem.name || "").trim();
