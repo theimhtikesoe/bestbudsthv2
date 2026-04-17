@@ -674,13 +674,12 @@ function processOrdersData(data) {
         'nf best buds shirt', 'sw best buds shirt'
       ];
 
-      let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
-      let isThcGummy = itemName.includes('thc gummy');
       let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
-      let isLobbyShirt = itemName.includes('the lobby shirt');
-      
       let isFB = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
+      let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+      let isThcGummy = itemName.includes('thc gummy');
+      let isLobbyShirt = itemName.includes('the lobby shirt');
 
       // Fallback to price if not clearly classified by name
       if (!isFlowerStrain && !isFB && !isAccessory) {
@@ -688,12 +687,13 @@ function processOrdersData(data) {
         if (unitPrice <= 50 && unitPrice > 0) {
           isFB = true;
         } else {
-          // Check if it's an accessory
-          const isAcc = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
-          if (!isAcc) {
-            isFlowerStrain = true; // Default to Main/Flower
-          }
+          isFlowerStrain = true; // Default to Main/Flower
         }
+      }
+
+      // Final override: if it's F&B or Accessory, it cannot be a Flower Strain
+      if (isFB || isAccessory) {
+        isFlowerStrain = false;
       }
 
       if (isFB) {
@@ -774,13 +774,12 @@ function processAutomatedReportRows(data) {
         'nf best buds shirt', 'sw best buds shirt'
       ];
 
-      let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
-      let isThcGummy = itemName.includes('thc gummy');
       let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
-      let isLobbyShirt = itemName.includes('the lobby shirt');
-      
       let isFB = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
                  (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
+      let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
+      let isThcGummy = itemName.includes('thc gummy');
+      let isLobbyShirt = itemName.includes('the lobby shirt');
 
       // Fallback to price if not clearly classified by name
       if (!isFlowerStrain && !isFB && !isAccessory) {
@@ -788,12 +787,13 @@ function processAutomatedReportRows(data) {
         if (unitPrice <= 50 && unitPrice > 0) {
           isFB = true;
         } else {
-          // Check if it's an accessory
-          const isAcc = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
-          if (!isAcc) {
-            isFlowerStrain = true; // Default to Main/Flower
-          }
+          isFlowerStrain = true; // Default to Main/Flower
         }
+      }
+
+      // Final override: if it's F&B or Accessory, it cannot be a Flower Strain
+      if (isFB || isAccessory) {
+        isFlowerStrain = false;
       }
 
       if (isFB) {
