@@ -664,7 +664,7 @@ function processOrdersData(data) {
         'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
         'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 
         'cocacola', 'coke', 'sprite', 'tonic water', 'soda water',
-        'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
+        'cookie', 'brownie', 'cake', 'soju', 'snack', 'food', 'bakery'
       ];
 
       const accessoryKeywords = [
@@ -675,8 +675,8 @@ function processOrdersData(data) {
       ];
 
       let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
-      let isFB = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
-                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
+      let isFB = (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'))) && !itemName.includes('gummy');
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
       let isLobbyShirt = itemName.includes('the lobby shirt');
@@ -764,7 +764,7 @@ function processAutomatedReportRows(data) {
         'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice',
         'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 
         'cocacola', 'coke', 'sprite', 'tonic water', 'soda water',
-        'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
+        'cookie', 'brownie', 'cake', 'soju', 'snack', 'food', 'bakery'
       ];
 
       const accessoryKeywords = [
@@ -775,8 +775,8 @@ function processAutomatedReportRows(data) {
       ];
 
       let isAccessory = accessoryKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword));
-      let isFB = fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
-                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'));
+      let isFB = (fbKeywords.some(keyword => itemName.includes(keyword) || category.includes(keyword)) ||
+                 (['tea'].some(keyword => itemName.includes(keyword) || category.includes(keyword)) && !itemName.includes('tea time'))) && !itemName.includes('gummy');
       let isFlowerStrain = flowerStrains.some(strain => itemName.includes(strain));
       let isThcGummy = itemName.includes('thc gummy');
       let isLobbyShirt = itemName.includes('the lobby shirt');

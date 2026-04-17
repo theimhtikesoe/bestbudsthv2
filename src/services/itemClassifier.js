@@ -19,7 +19,7 @@ const FB_KEYWORDS = [
   'cider', 'spirit', 'cocktail', 'milk', 'coffee', 'tea', 'juice', 
   'corona', 'sato', 'budweiser', 'singha', 'asahi', 'chang', 'leo', 
   'cocacola', 'coke', 'sprite', 'tonic water', 'soda water',
-  'cookie', 'brownie', 'cake', 'soju', 'gummy', 'snack', 'food', 'bakery'
+  'cookie', 'brownie', 'cake', 'soju', 'snack', 'food', 'bakery'
 ];
 
 const ACCESSORY_KEYWORDS = [
@@ -59,8 +59,8 @@ function classifyItem(itemName, categoryName = '', unitPrice = 0) {
       cat.includes('bakery');
   
   if (isFB) {
-    // Exception: 'tea time' should not be F&B
-    if (name.includes('tea time')) return 'main';
+    // Exception: 'tea time' and 'gummy' should not be F&B
+    if (name.includes('tea time') || name.includes('gummy')) return 'main';
     return 'fb';
   }
 
