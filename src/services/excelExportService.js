@@ -120,11 +120,20 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
   let totalFlowerGrams = 0;
   let calculatedFbTotal = 0;
 
-  receipts.forEach(receipt => {
-    // Receipts are already filtered by filterOutRefundReceipts() in the controller.
-    // This extra check is a safety guard to skip any remaining refund/voided receipts.
-    if (isRefundReceipt(receipt)) return;
-    const items = receipt.line_items || receipt.items || [];
+    receipts.forEach(receipt => {
+      // Receipts are already filtered by filterOutRefundReceipts() in the controller.
+      // This extra check is a safety guard to skip any remaining refund/voided receipts.
+      if (isRefundReceipt(receipt)) return;
+      
+      // [FIX] Check for 100% receipt-level discount
+      const receiptDiscounts = receipt.total_discounts || receipt.discounts || receipt.applied_discounts || [];
+      const has100PercentReceiptDiscount = receiptDiscounts.some(d => {
+        const p = d.percentage || d.percent || d.rate;
+        return p >= 99.99;
+      });
+
+      const items = receipt.line_items || receipt.items || [];
+
     const paymentMethod = (receipt.payments && receipt.payments[0]?.payment_type?.name) || 
                            (receipt.payments && receipt.payments[0]?.name) || 'N/A';
     const receiptNumber = receipt.receipt_number || receipt.number || 'N/A';
@@ -251,8 +260,8 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
       if (isFlowerStrain && !isThcGummy && !isAccessory && !isLobbyShirt) {
         displayQty = '-';
         displayGram = `${qty.toFixed(3)} G`;
-        // Only add to total grams if NOT 100% discounted AND price > 0
-        if (!is100PercentDiscount && itemNetPrice > 0.01) {
+        // Only add to total grams if NOT 100% discounted AND price > 0 AND no 100% receipt discount
+        if (!is100PercentDiscount && itemNetPrice > 0.01 && !has100PercentReceiptDiscount) {
           totalFlowerGrams += qty;
         }
       }

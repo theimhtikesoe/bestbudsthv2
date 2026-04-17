@@ -571,12 +571,12 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
     const itemDiscountPercent = itemGrossTotal > 0 ? (itemDiscount / itemGrossTotal * 100) : 0;
     
     // Strictly exclude items with 100% discount or price 0 from gram totals
-    const is100PercentDiscount = itemTotal <= 0.01 || itemDiscountPercent >= 99.99;
+    // We check both the line-level total AND whether the receipt has a 100% discount entry
+    const discountEntries = extractDiscountEntriesFromReceipt(receipt);
+    const has100PercentReceiptDiscount = discountEntries.some(d => d.percentage >= 99.99);
     
-    // [FIX] If the item is 100% discounted or price is 0, we still process it for the table 
-    // (so it shows up in the report), but we MUST NOT add its grams to the total.
-    // The 'continue' here was skipping the entire item, but the user wants it in the report,
-    // just with the Gram column empty/not counted.
+    // An item is effectively free if its net price is 0 OR the receipt has a 100% discount
+    const isEffectivelyFree = itemTotal <= 0.01 || itemDiscountPercent >= 99.99 || has100PercentReceiptDiscount;
 
     let qty = extractLineItemQty(lineItem);
 
@@ -616,7 +616,7 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       const isLobbyShirt = itemName.includes('the lobby shirt');
       const isThcGummy = itemName.includes('thc gummy');
       
-      if (!isFB && !isAcc && !isLobbyShirt && !isThcGummy && !is100PercentDiscount) {
+      if (!isFB && !isAcc && !isLobbyShirt && !isThcGummy && !isEffectivelyFree) {
         totalGram += qty;
         if (!mainItemName) {
           mainItemName = String(lineItem.item_name || lineItem.name || "").trim();
