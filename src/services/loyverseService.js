@@ -570,6 +570,7 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
     const itemDiscount = Math.max(0, itemGrossTotal - itemTotal);
     const itemDiscountPercent = itemGrossTotal > 0 ? (itemDiscount / itemGrossTotal * 100) : 0;
     
+    // Strictly exclude items with 100% discount or price 0 from gram totals
     if (itemTotal <= 0.01 || itemDiscountPercent >= 99.99) continue;
 
     let qty = extractLineItemQty(lineItem);
