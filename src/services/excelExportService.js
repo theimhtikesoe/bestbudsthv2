@@ -251,8 +251,8 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
       if (isFlowerStrain && !isThcGummy && !isAccessory && !isLobbyShirt) {
         displayQty = '-';
         displayGram = `${qty.toFixed(3)} G`;
-        // Only add to total grams if NOT 100% discounted
-        if (!is100PercentDiscount) {
+        // Only add to total grams if NOT 100% discounted AND price > 0
+        if (!is100PercentDiscount && itemNetPrice > 0.01) {
           totalFlowerGrams += qty;
         }
       }
