@@ -86,7 +86,7 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
     'accessories', 'merchandise', 'bong', 'paper', 'tip', 'grinder',
     'shirt', 'hat', 'lighter', 'the lobby', 'merch', 'ashtray', 'ash tray',
     'pipe', 'small pipe', 'best buds grinder', 'best buds shirt',
-    'nf best buds shirt', 'sw best buds shirt'
+    'nf best buds shirt', 'sw best buds shirt', 'balm 10g'
   ];
 
   function toMoneyNumber(value) {

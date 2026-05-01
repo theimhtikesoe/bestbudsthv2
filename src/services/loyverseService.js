@@ -615,8 +615,9 @@ function buildAutomatedReceiptRow(receipt, itemCategoryMap = new Map()) {
       // Also exclude specific items that might be classified as 'main' but shouldn't have grams
       const isLobbyShirt = itemName.includes('the lobby shirt');
       const isThcGummy = itemName.includes('thc gummy');
+      const isBalm = itemName.includes('balm 10g');
       
-      if (!isFB && !isAcc && !isLobbyShirt && !isThcGummy && !isEffectivelyFree) {
+      if (!isFB && !isAcc && !isLobbyShirt && !isThcGummy && !isBalm && !isEffectivelyFree) {
         totalGram += qty;
         if (!mainItemName) {
           mainItemName = String(lineItem.item_name || lineItem.name || "").trim();
