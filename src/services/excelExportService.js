@@ -70,8 +70,9 @@ async function generateExcelReport(date, reportData, receipts, expenses, closing
     'big foot', 'honey bee', 'jealousy mintz', 'crystal candy',
     'alien mint', 'rocket fuel', 'gold dust', 'darth vader',
     'cherry pop tarts', 'white cherry gelato', 'dosidos', 'obama runtz',
-    'free pina colada', 'thc gummy', 'flower', 'bud', 'pre-roll', 'joint',
-    'cheese candy', 'vino tinto', 'mac stormper', 'r2d2 fluid', 'planet of the grape'
+    'free pina colada', 'fakescotti', 'pina colada', 'thc gummy', 'flower', 
+    'bud', 'pre-roll', 'joint', 'cheese candy', 'vino tinto', 'mac stormper', 
+    'r2d2 fluid', 'planet of the grape'
   ];
 
   const fbKeywords = [
