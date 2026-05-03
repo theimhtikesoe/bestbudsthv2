@@ -946,16 +946,25 @@ function renderDailySalesTrendChart(orders) {
         datasets: [{
         label: 'Sales (THB)',
         data: salesData,
-        borderColor: '#0066cc',
-        backgroundColor: 'rgba(0, 102, 204, 0.2)',
-        borderWidth: 3,
+        borderColor: '#e0a040',
+        backgroundColor: (context) => {
+          const chart = context.chart;
+          const {ctx, chartArea} = chart;
+          if (!chartArea) return null;
+          const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+          gradient.addColorStop(0, 'rgba(224, 160, 64, 0.4)');
+          gradient.addColorStop(1, 'rgba(224, 160, 64, 0.0)');
+          return gradient;
+        },
+        borderWidth: 4,
         fill: true,
-        tension: 0.4,
-        pointRadius: 4,
-        pointBackgroundColor: '#0066cc',
+        tension: 0.45,
+        pointRadius: 0,
+        pointHoverRadius: 8,
+        pointHitRadius: 30,
+        pointBackgroundColor: '#e0a040',
         pointBorderColor: '#ffffff',
-        pointBorderWidth: 2,
-        pointHoverRadius: 6
+        pointBorderWidth: 2
       }]
     },
     options: {
@@ -991,27 +1000,26 @@ function renderDailySalesTrendChart(orders) {
         y: {
           beginAtZero: true,
           ticks: {
-            color: '#f5f1e8',
-            font: { weight: 'bold', size: 12 },
+            color: 'rgba(245, 241, 232, 0.7)',
+            font: { size: 11 },
             callback: function(value) {
-              return 'THB ' + value.toLocaleString();
+              if (value >= 1000) return '฿' + (value / 1000) + 'k';
+              return '฿' + value;
             }
           },
           grid: {
-            color: 'rgba(255, 255, 255, 0.15)',
+            color: 'rgba(255, 255, 255, 0.05)',
             drawBorder: false
           }
         },
         x: {
           ticks: {
-            color: '#f5f1e8',
-            font: { weight: 'bold', size: 11 },
-            maxRotation: 45,
-            minRotation: 45
+            color: 'rgba(245, 241, 232, 0.7)',
+            font: { size: 11 },
+            maxRotation: 0
           },
           grid: {
-            color: 'rgba(255, 255, 255, 0.1)',
-            drawBorder: false
+            display: false
           }
         }
       }
@@ -1043,13 +1051,15 @@ function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
       datasets: [{
         data: [cash, card, transfer],
         backgroundColor: [
-          '#2ecc8a',
-          '#0066cc',
-          '#f0ad4e'
+          '#4edd9f', // var(--positive)
+          '#e0a040', // var(--accent-strong)
+          '#ffa500'  // var(--amber)
         ],
         borderColor: '#1a1a1a',
-        borderWidth: 3,
-        hoverOffset: 15
+        borderWidth: 4,
+        hoverOffset: 20,
+        borderRadius: 8,
+        spacing: 5
       }]
     },
     options: {
@@ -1060,9 +1070,9 @@ function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
           display: true,
           position: 'bottom',
           labels: {
-            color: '#f5f1e8',
-            font: { weight: 'bold', size: 13 },
-            padding: 20,
+            color: 'rgba(245, 241, 232, 0.8)',
+            font: { size: 12 },
+            padding: 25,
             usePointStyle: true,
             pointStyle: 'circle',
             generateLabels: function(chart) {
@@ -1071,10 +1081,10 @@ function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
                 const value = data.datasets[0].data[i];
                 const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
                 return {
-                  text: `${label}: THB ${value.toLocaleString(undefined, {minimumFractionDigits: 2})} (${percentage}%)`,
+                  text: `${label}: ${percentage}%`,
                   fillStyle: data.datasets[0].backgroundColor[i],
                   strokeStyle: data.datasets[0].backgroundColor[i],
-                  fontColor: '#f5f1e8',
+                  fontColor: 'rgba(245, 241, 232, 0.8)',
                   lineWidth: 0,
                   hidden: false,
                   index: i
@@ -1087,21 +1097,18 @@ function renderPaymentMethodChart(cashTotal, cardTotal, transferTotal) {
           backgroundColor: 'rgba(0, 0, 0, 0.9)',
           titleColor: '#ffffff',
           bodyColor: '#ffffff',
-          titleFont: { size: 14, weight: 'bold' },
-          bodyFont: { size: 14 },
-          borderColor: '#0066cc',
-          borderWidth: 2,
           padding: 12,
+          cornerRadius: 8,
           callbacks: {
             label: function(context) {
               const value = context.parsed;
               const percentage = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
-              return `${context.label}: THB ${value.toLocaleString(undefined, {minimumFractionDigits: 2})} (${percentage}%)`;
+              return ` ${context.label}: ฿${value.toLocaleString()} (${percentage}%)`;
             }
           }
         }
       },
-      cutout: '60%'
+      cutout: '75%'
     }
   });
 }
@@ -1252,13 +1259,22 @@ async function renderHistoricalSalesTrendChart() {
         datasets: [{
           label: 'Daily Net Sales (THB)',
           data: salesValues,
-          borderColor: '#ffcc00',
-          backgroundColor: 'rgba(255, 204, 0, 0.2)',
-          borderWidth: 3,
+          borderColor: '#e0a040',
+          backgroundColor: (context) => {
+            const chart = context.chart;
+            const {ctx, chartArea} = chart;
+            if (!chartArea) return null;
+            const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+            gradient.addColorStop(0, 'rgba(224, 160, 64, 0.4)');
+            gradient.addColorStop(1, 'rgba(224, 160, 64, 0.0)');
+            return gradient;
+          },
+          borderWidth: 4,
           fill: true,
-          tension: 0.4,
-          pointRadius: 5,
-          pointBackgroundColor: '#ffcc00',
+          tension: 0.45,
+          pointRadius: 4,
+          pointHoverRadius: 8,
+          pointBackgroundColor: '#e0a040',
           pointBorderColor: '#ffffff',
           pointBorderWidth: 2
         }]
@@ -1284,12 +1300,16 @@ async function renderHistoricalSalesTrendChart() {
         scales: {
           y: {
             beginAtZero: true,
-            ticks: { color: '#f5f1e8', font: { weight: 'bold', size: 12 }, callback: (v) => 'THB ' + v.toLocaleString() },
-            grid: { color: 'rgba(255, 255, 255, 0.15)', drawBorder: false }
+            ticks: { 
+              color: 'rgba(245, 241, 232, 0.7)', 
+              font: { size: 11 }, 
+              callback: (v) => v >= 1000 ? '฿' + (v / 1000) + 'k' : '฿' + v 
+            },
+            grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false }
           },
           x: {
-            ticks: { color: '#f5f1e8', font: { weight: 'bold', size: 11 } },
-            grid: { color: 'rgba(255, 255, 255, 0.1)', drawBorder: false }
+            ticks: { color: 'rgba(245, 241, 232, 0.7)', font: { size: 11 } },
+            grid: { display: false }
           }
         }
       }
@@ -1361,13 +1381,23 @@ window.updateChartsAfterReportLoad = function(data) {
           datasets: [{
             label: 'Sales (THB)',
             data: salesData,
-            borderColor: '#0066cc',
-            backgroundColor: 'rgba(0, 102, 204, 0.2)',
-            borderWidth: 3,
+            borderColor: '#e0a040',
+            backgroundColor: (context) => {
+              const chart = context.chart;
+              const {ctx, chartArea} = chart;
+              if (!chartArea) return null;
+              const gradient = ctx.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+              gradient.addColorStop(0, 'rgba(224, 160, 64, 0.4)');
+              gradient.addColorStop(1, 'rgba(224, 160, 64, 0.0)');
+              return gradient;
+            },
+            borderWidth: 4,
             fill: true,
-            tension: 0.4,
-            pointRadius: 4,
-            pointBackgroundColor: '#0066cc',
+            tension: 0.45,
+            pointRadius: 0,
+            pointHoverRadius: 8,
+            pointHitRadius: 30,
+            pointBackgroundColor: '#e0a040',
             pointBorderColor: '#ffffff',
             pointBorderWidth: 2
           }]
@@ -1393,12 +1423,16 @@ window.updateChartsAfterReportLoad = function(data) {
           scales: {
             y: {
               beginAtZero: true,
-              ticks: { color: '#f5f1e8', font: { weight: 'bold', size: 12 }, callback: (v) => 'THB ' + v.toLocaleString() },
-              grid: { color: 'rgba(255, 255, 255, 0.15)', drawBorder: false }
+              ticks: { 
+                color: 'rgba(245, 241, 232, 0.7)', 
+                font: { size: 11 }, 
+                callback: (v) => v >= 1000 ? '฿' + (v / 1000) + 'k' : '฿' + v 
+              },
+              grid: { color: 'rgba(255, 255, 255, 0.05)', drawBorder: false }
             },
             x: {
-              ticks: { color: '#f5f1e8', font: { weight: 'bold', size: 11 } },
-              grid: { color: 'rgba(255, 255, 255, 0.1)', drawBorder: false }
+              ticks: { color: 'rgba(245, 241, 232, 0.7)', font: { size: 11 } },
+              grid: { display: false }
             }
           }
         }

@@ -424,10 +424,30 @@ body {
 
 /* Charts */
 .chart-container {
-  background: rgba(26, 26, 26, 0.7) !important;
-  border: 1px solid rgba(200, 136, 46, 0.2) !important;
-  border-radius: 1rem !important;
-  padding: 1.5rem !important;
+  background: linear-gradient(145deg, rgba(26, 26, 26, 0.9), rgba(15, 15, 15, 0.95)) !important;
+  border: 1px solid rgba(224, 160, 64, 0.15) !important;
+  border-radius: 1.25rem !important;
+  padding: 1.75rem !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.05) !important;
+  transition: transform 0.3s ease, border-color 0.3s ease;
+}
+
+.chart-container:hover {
+  border-color: rgba(224, 160, 64, 0.3) !important;
+}
+
+.chart-header-custom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.chart-legend-custom {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
 }
 
 /* Headings */
